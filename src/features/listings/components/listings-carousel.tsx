@@ -77,7 +77,7 @@ export function ListingsCarousel({ listings, whatsappNumber, variant, label }: L
         aria-label={`${label}, em ordem`}
         onScroll={measure}
         onKeyDown={onKeyDown}
-        className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2 [scrollbar-width:thin] motion-safe:scroll-smooth"
+        className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2 [scrollbar-width:none] motion-safe:scroll-smooth [&::-webkit-scrollbar]:hidden"
       >
         {listings.map((listing, index) => (
           <li

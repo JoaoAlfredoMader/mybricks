@@ -68,7 +68,7 @@ export function SaleSection({ form, propertyId, wasForSale, error }: SaleSection
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Anunciar este imóvel?</AlertDialogTitle>
-                    <AlertDialogDescription>Este imóvel aparecerá em formato de anúncio nesta plataforma.</AlertDialogDescription>
+                    <AlertDialogDescription className="text-pretty">Este imóvel aparecerá em formato de anúncio nesta plataforma.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <div className="grid gap-3 text-sm sm:grid-cols-2">
                     <div>
@@ -126,7 +126,7 @@ export function SaleSection({ form, propertyId, wasForSale, error }: SaleSection
             {gaps.length > 0 || photoMissing ? (
               <>
                 <p className="flex items-center gap-2 font-medium">
-                  <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />O anúncio só vai ao ar com
+                  <TriangleAlert className="size-4 shrink-0" aria-hidden="true" />O anúncio só vai ao ar quando tiver:
                 </p>
                 <ul className="mt-1.5 list-disc pl-10 text-foreground/80">
                   {photoMissing && (
