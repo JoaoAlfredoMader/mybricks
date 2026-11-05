@@ -200,6 +200,8 @@ export interface paths {
         /**
          * Create a property
          * @description Address, manual rental, acquisition, financing, legal record and insurance are nested. Cross-field rules are checked: the usage must be allowed for the type, the subtype must belong to it, only parking has a spot label, a financing needs a purchase or construction acquisition.
+         *
+         *     **For sale.** `forSale: { priceCents, consent: true }` puts the property up for sale; sending it is the owner's consent to show it as a public listing (see `listListings`). Without `consent: true`, or with a price that is not greater than zero, the answer is `422`. The response carries `forSale` with the derived `status` (`pending` while a photo, a neighborhood or an area is missing, `live` when public, `hidden` when a platform admin took it down) and what is `missing`, so a property can be marked for sale before its photos are uploaded.
          */
         post: operations["createProperty"];
         delete?: never;
@@ -229,6 +231,8 @@ export interface paths {
         /**
          * Update a property
          * @description Any subset of the fields. `null` clears a nullable field. The nested blocks (address, manualRental, acquisition, financing, legalRecord, insurance) are replaced as a whole, and `null` removes them.
+         *
+         *     **For sale.** `forSale: { priceCents, consent: true }` puts the property up for sale or edits its price (`422` without `consent: true` or with a price that is not greater than zero); editing the price of a property already for sale keeps the original consent and its date (`consentedAt`). `forSale: null` takes it off the market and clears the price and the consent, but not the platform admin's moderation: turning it on again does not undo a `hidden` listing.
          */
         patch: operations["updateProperty"];
         trace?: never;
@@ -245,6 +249,48 @@ export interface paths {
          * @description The SAC or Price installments and where the financing stands on `asOf`.
          */
         get: operations["getFinancingSchedule"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The properties for sale
+         * @description **Public: no session.** The only data that leaves an organization, so it is a whitelist: type, subtype, asking price, area, rooms, built year, conservation state, city, state, neighborhood, photo count and the path of the cover. Never the name, notes, street, number, complement, postal code, coordinates, client, owner, agency, organization, estimated value, expenses, ownership share, financing, rent, documents or any id of an organization or user.
+         *
+         *     A property is listed when its owner put it up for sale (which is the consent), a platform admin did not hide it, its organization is not a demo workspace and it has at least one photo, a neighborhood (the city comes with the address) and an area. Newest consent first; `limit` defaults to 12, at most 24. `whatsappNumber` is the platform's, where every card leads: the owner's contact is never shown. Cached for a minute.
+         */
+        get: operations["listListings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/listings/{id}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The first photo of a listing
+         * @description **Public: no session.** The first photo by position, only while the listing is live; a pending, hidden, not-for-sale or unknown property is the same `404`. Served inline with the file's type, `nosniff` and a neutral file name, cached publicly for an hour.
+         */
+        get: operations["getListingCover"];
         put?: never;
         post?: never;
         delete?: never;
@@ -812,6 +858,26 @@ export interface paths {
         patch: operations["adminSetFeedbackStatus"];
         trace?: never;
     };
+    "/api/admin/listings/{propertyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Hide or show a listing
+         * @description `{ hidden: true }` takes a for-sale property out of the public listings (its owner still sees it, with status `hidden`); `{ hidden: false }` shows it again. `404` when the property does not exist or is not for sale. The moderation survives the owner turning the sale off and on again. Audited as a platform-level event.
+         */
+        patch: operations["setListingHidden"];
+        trace?: never;
+    };
     "/api/admin/audit-logs": {
         parameters: {
             query?: never;
@@ -982,6 +1048,20 @@ export interface components {
             /** @description A value means the property is insured */
             insurance: {
                 description: string | null;
+            } | null;
+            /** @description A value means the property is for sale, and so a public listing once it is complete */
+            forSale: {
+                /** @description Asking price in integer cents (BRL); the listing never shows the estimated value */
+                priceCents: number;
+                /** @description When the owner agreed to publish the property as a listing; editing the price does not renew it */
+                consentedAt: string;
+                /**
+                 * @description Derived, never stored: `hidden` when the platform admin took the listing down (it wins over the rest), `pending` while `missing` is not empty, else `live` (public)
+                 * @enum {string}
+                 */
+                status: "pending" | "live" | "hidden";
+                /** @description What is still needed to go live; empty when nothing is missing */
+                missing: ("photo" | "address" | "area")[];
             } | null;
             createdById: string;
             /** @description ISO 8601 timestamp */
@@ -1176,6 +1256,54 @@ export interface components {
             pageSize: number;
             /** @description Total number of items across all pages */
             total: number;
+        };
+        Listing: {
+            /**
+             * Format: uuid
+             * @description The id of the property
+             */
+            id: string;
+            /** @description The first 8 characters of the id, in capitals: what the visitor quotes on WhatsApp */
+            reference: string;
+            /** @enum {string} */
+            propertyType: "residential" | "commercial" | "land" | "logistics" | "rural" | "parking";
+            /** @description Apartment, House, Farm... (pt-BR) */
+            subtypeName: string | null;
+            /** @description The asking price in integer cents (BRL), never the estimated value */
+            salePriceCents: number;
+            /** @description The private area, or the total area when there is none. Hectares (`ha`) for rural properties, square meters (`m2`) otherwise */
+            area: {
+                value: number;
+                /** @enum {string} */
+                unit: "m2" | "ha";
+            };
+            bedrooms: number | null;
+            suites: number | null;
+            bathrooms: number | null;
+            parkingSpaces: number | null;
+            builtYear: number | null;
+            conservationState: ("degraded" | "poor" | "regular" | "good" | "excellent") | null;
+            city: string;
+            /** @description Two-letter state code */
+            state: string;
+            neighborhood: string;
+            photoCount: number;
+            /** @description Path of the public endpoint that serves the first photo (`/api/listings/{id}/cover`) */
+            coverPhotoUrl: string;
+            /** @description When the owner agreed to publish the property */
+            listedAt: string;
+        };
+        Listings: {
+            /** @description The platform's WhatsApp, digits only, in `wa.me` format (country code, area code, number). It is MyBricks' number, never the owner's */
+            whatsappNumber: string;
+            items: components["schemas"]["Listing"][];
+        };
+        ListingModeration: {
+            /** Format: uuid */
+            propertyId: string;
+            hidden: boolean;
+            /** @description When the listing was taken down; null while it is shown */
+            hiddenAt: string | null;
         };
         PropertyKpis: {
             /** Format: uuid */
@@ -1607,6 +1735,12 @@ export interface components {
                 /** Format: date */
                 firstInstallmentOn: string;
             } | null;
+            forSale?: {
+                /** @description Asking price in integer cents (BRL); must be greater than zero (422 otherwise). Never the estimated value */
+                priceCents?: number | null;
+                /** @description Must be true (422 otherwise): the owner agrees to publish the property as a public listing */
+                consent?: boolean | null;
+            } | null;
         };
         UpdatePropertyRequest: {
             name?: string;
@@ -1676,6 +1810,12 @@ export interface components {
                 amortizationSystem: "sac" | "price";
                 /** Format: date */
                 firstInstallmentOn: string;
+            } | null;
+            forSale?: {
+                /** @description Asking price in integer cents (BRL); must be greater than zero (422 otherwise). Never the estimated value */
+                priceCents?: number | null;
+                /** @description Must be true (422 otherwise): the owner agrees to publish the property as a public listing */
+                consent?: boolean | null;
             } | null;
         };
         CreateContractRequest: {
@@ -1799,6 +1939,9 @@ export interface components {
         UpdateFeedbackStatusRequest: {
             /** @enum {string} */
             status: "open" | "resolved";
+        };
+        SetListingHiddenRequest: {
+            hidden: boolean;
         };
     };
     responses: never;
@@ -2564,6 +2707,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description A business rule forbids it */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     getProperty: {
@@ -2713,6 +2865,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description A business rule forbids it */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     getFinancingSchedule: {
@@ -2748,6 +2909,77 @@ export interface operations {
             };
             /** @description There is no valid session */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The record does not exist, or it is outside what the caller may see (another organization, or another member's record) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listListings: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The live listings and the platform's WhatsApp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Listings"];
+                };
+            };
+            /** @description The request is not valid: bad input, malformed JSON or a rule that spans several fields */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getListingCover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image, inline */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            /** @description The request is not valid: bad input, malformed JSON or a rule that spans several fields */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5075,6 +5307,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminFeedback"];
+                };
+            };
+            /** @description The request is not valid: bad input, malformed JSON or a rule that spans several fields */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description There is no valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The session does not allow this */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The record does not exist, or it is outside what the caller may see (another organization, or another member's record) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    setListingHidden: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                propertyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetListingHiddenRequest"];
+            };
+        };
+        responses: {
+            /** @description Where the listing stands now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListingModeration"];
                 };
             };
             /** @description The request is not valid: bad input, malformed JSON or a rule that spans several fields */
