@@ -94,6 +94,10 @@
     --positive: #006300;
     --negative: #c62f2f;
 
+    /* The WhatsApp button: the one brand colour outside the tokens (white on it reads at 4.6:1). */
+    --whatsapp: #128c4a;
+    --whatsapp-hover: #0e7a3f;
+
     --sidebar: #ffffff;
     --sidebar-foreground: #0f172a;
     --sidebar-primary: #1e293b;
