@@ -2,6 +2,7 @@ import '@fontsource-variable/archivo/standard.css'
 import '@fontsource-variable/bricolage-grotesque/standard.css'
 import '../landing.css'
 import { useRef } from 'react'
+import { ListingsShowcase } from '@/features/listings/components/listings-showcase'
 import { useScene } from '../hooks/use-scene'
 import { Hero } from './hero'
 import { LandingFooter, Story } from './story'
@@ -23,6 +24,7 @@ export function LandingPage() {
       <Hero scene={scene} onToggleScene={toggleScene} onReadStory={readStory} />
       <main>
         <Story ref={storyRef} />
+        <ListingsShowcase variant="landing" />
       </main>
       <LandingFooter />
     </div>

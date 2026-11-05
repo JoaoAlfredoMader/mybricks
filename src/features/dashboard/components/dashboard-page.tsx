@@ -1,5 +1,6 @@
 import { Clock } from 'lucide-react'
 import type { ActiveOrganization } from '@/features/auth/api/organization'
+import { ListingsShowcase } from '@/features/listings/components/listings-showcase'
 import { CashFlowSection } from '@/features/finances/components/cash-flow-section'
 import { formatCompactMoney, formatDate, formatRate, formatTimeUntil } from '@/lib/format'
 import type { PortfolioKpis } from '../api/portfolio-kpis'
@@ -86,6 +87,8 @@ export function DashboardPage({ kpis, organization }: DashboardPageProps) {
           </p>
         )}
       </section>
+
+      <ListingsShowcase variant="app" />
     </main>
   )
 }

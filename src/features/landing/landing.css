@@ -87,6 +87,14 @@
   pointer-events: none;
 }
 
+/* The asking price on a listing: the hero title's wide Archivo, at the size of a figure. */
+.listing-price {
+  font-family: 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
+  font-stretch: 125%;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
 /* Day to night ------------------------------------------------------------- */
 
 /* Night falls from the top of the sky down to the street. */
