@@ -44,6 +44,11 @@ export const api = createClient<paths>({
   fetch: (request) => globalThis.fetch(request),
 })
 
+/** The absolute URL of an API path, for what the browser loads itself (an <img>, a link). */
+export function apiUrl(path: string): string {
+  return `${globalThis.location?.origin ?? ''}${path}`
+}
+
 /** Returns the data of a successful answer or throws an ApiError. */
 export async function unwrap<T>(request: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
   const { data, error, response } = await request

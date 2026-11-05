@@ -7,6 +7,7 @@ import type { CashFlow, CreateTransactionRequest, Transaction, TransactionCatego
 import type { Occupant } from '@/features/occupants/api/queries'
 import type { CreateReservationRequest, Reservation } from '@/features/reservations/api/queries'
 import type { PortfolioKpis, PropertyKpis } from '@/features/dashboard/api/portfolio-kpis'
+import type { Listing } from '@/features/listings/api/queries'
 import type { Photo, PropertyDocument } from '@/features/properties/api/files'
 import type { FinancingSchedule, Property, PropertyCatalog } from '@/features/properties/api/queries'
 import type { PropertyRequest as PropertyRequestBody } from '@/features/properties/lib/property-form'
@@ -137,6 +138,36 @@ export function makePropertyRecord(overrides: Partial<Property> = {}): Property 
     createdById: 'user-1',
     createdAt: '2026-11-04T12:00:00.000Z',
     updatedAt: '2026-11-04T12:00:00.000Z',
+    ...overrides,
+  }
+}
+
+
+let listingSeq = 0
+
+/** One public listing as GET /api/listings sends it: a two-bedroom apartment with every field filled in. */
+export function makeListing(overrides: Partial<Listing> = {}): Listing {
+  listingSeq += 1
+  const id = `00000000-0000-4000-8000-${String(900_000 + listingSeq).padStart(12, '0')}`
+  return {
+    id,
+    reference: id.slice(0, 8).toUpperCase(),
+    propertyType: 'residential',
+    subtypeName: 'Apartamento',
+    salePriceCents: 45_000_000,
+    area: { value: 62.5, unit: 'm2' },
+    bedrooms: 2,
+    suites: 1,
+    bathrooms: 2,
+    parkingSpaces: 1,
+    builtYear: 2012,
+    conservationState: 'good',
+    city: 'Florianópolis',
+    state: 'SC',
+    neighborhood: 'Centro',
+    photoCount: 3,
+    coverPhotoUrl: `/api/listings/${id}/cover`,
+    listedAt: '2026-11-01T15:00:00.000Z',
     ...overrides,
   }
 }
@@ -404,6 +435,8 @@ interface FakeApiOptions {
   transactions?: Transaction[]
   /** Tenants and guests on file, for GET /api/occupants. */
   occupants?: Occupant[]
+  /** The public listings; the platform's WhatsApp is the one the real API sends. */
+  listings?: Listing[]
   handlers?: Record<string, Handler>
 }
 
@@ -426,6 +459,7 @@ export function fakeApi({
   template,
   transactions = [],
   occupants = [],
+  listings = [],
   handlers = {},
 }: FakeApiOptions = {}) {
   const state = {
@@ -848,6 +882,8 @@ export function fakeApi({
   }
 
   const defaults: Record<string, Handler> = {
+    // Public: answers without a session.
+    'GET /api/listings': () => json({ whatsappNumber: '5548991802046', items: listings }),
     'GET /api/me': () => (state.session ? json(state.session) : json(UNAUTHENTICATED, 401)),
     'GET /api/kpis/portfolio': () => (state.session ? json(state.kpis) : json(UNAUTHENTICATED, 401)),
     'GET /api/lookups/property-catalog': () => json(CATALOG),
