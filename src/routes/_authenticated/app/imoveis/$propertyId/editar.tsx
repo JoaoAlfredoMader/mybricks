@@ -40,6 +40,7 @@ export function EditPropertyRoute() {
       clients={clients}
       agencies={agencies}
       submitLabel="Salvar alterações"
+      propertyId={propertyId}
       cancel={back}
       onSubmit={async (request) => {
         await update.mutateAsync(request)

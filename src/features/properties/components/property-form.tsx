@@ -33,6 +33,7 @@ import {
   toPropertyRequest,
 } from '../lib/property-form'
 import { CityCombobox } from './city-combobox'
+import { SaleSection } from './sale-section'
 
 function entries<T extends string>(labels: Record<T, string>) {
   return (Object.entries(labels) as [T, string][]).map(([value, label]) => ({ value, label }))
@@ -44,12 +45,14 @@ interface PropertyFormProps {
   clients: { id: string; name: string }[]
   agencies: { id: string; name: string }[]
   submitLabel: string
+  /** Set when editing an existing property. */
+  propertyId?: string
   /** Where "Cancelar" goes. */
   cancel: { to: '/app/imoveis' } | { to: '/app/imoveis/$propertyId'; params: { propertyId: string } }
   onSubmit: (request: PropertyRequest) => Promise<unknown>
 }
 
-export function PropertyForm({ initialValues, catalog, clients, agencies, submitLabel, cancel, onSubmit }: PropertyFormProps) {
+export function PropertyForm({ initialValues, catalog, clients, agencies, submitLabel, propertyId, cancel, onSubmit }: PropertyFormProps) {
   const form = useForm<PropertyFormValues>({
     resolver: zodResolver(propertyFormSchema(catalog)),
     defaultValues: initialValues,
@@ -252,6 +255,8 @@ export function PropertyForm({ initialValues, catalog, clients, agencies, submit
         {number('annualExpenses', 'Despesas por ano', { prefix: 'R$', hint: 'Condomínio, IPTU, manutenção…' })}
         {number('occupancyRate', 'Ocupação esperada', { suffix: '%', hint: 'Quanto do ano o imóvel deve ficar ocupado.' })}
       </Section>
+
+      <SaleSection form={form} propertyId={propertyId} wasForSale={initialValues.forSale} error={error('salePrice')} />
 
       {earnsIncome(usageType) && (
         <Section title="Aluguel">

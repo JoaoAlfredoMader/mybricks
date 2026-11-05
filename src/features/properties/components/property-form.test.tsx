@@ -177,6 +177,98 @@ describe('Property form', { timeout: 20_000 }, () => {
     expect(await screen.findByText('R$ 700 mil', { normalizer: (t) => t.replace(/ /g, ' ') })).toBeInTheDocument()
   })
 
+  describe('sale', () => {
+    it('asks for consent before turning the switch on, and cancelling leaves it off', async () => {
+      const user = userEvent.setup()
+      fakeApi({ session: makeSession() })
+      renderRoute('/app/imoveis/novo')
+
+      const toggle = await screen.findByRole('switch', { name: 'À venda' })
+      expect(screen.queryByLabelText('Preço de venda')).not.toBeInTheDocument()
+
+      await user.click(toggle)
+      const dialog = await screen.findByRole('alertdialog')
+      expect(within(dialog).getByText('Este imóvel aparecerá em formato de anúncio nesta plataforma.')).toBeInTheDocument()
+      expect(within(dialog).getByText('O bairro e a cidade')).toBeInTheDocument()
+      expect(within(dialog).getByText('A rua e o número')).toBeInTheDocument()
+      expect(toggle).not.toBeChecked()
+
+      await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+      expect(toggle).not.toBeChecked()
+      expect(screen.queryByLabelText('Preço de venda')).not.toBeInTheDocument()
+
+      await user.click(toggle)
+      await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Anunciar' }))
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+      expect(toggle).toBeChecked()
+      expect(screen.getByLabelText('Preço de venda')).toBeInTheDocument()
+    })
+
+    it('tells what the listing still lacks, and to add a photo after saving', async () => {
+      const user = userEvent.setup()
+      fakeApi({ session: makeSession() })
+      renderRoute('/app/imoveis/novo')
+
+      await user.click(await screen.findByRole('switch', { name: 'À venda' }))
+      await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Anunciar' }))
+
+      const gaps = await screen.findByTestId('listing-gaps')
+      expect(gaps).toHaveTextContent('Adicione ao menos uma foto depois de salvar.')
+      expect(gaps).toHaveTextContent('Informe a cidade e o bairro')
+      expect(gaps).toHaveTextContent('Informe a área privativa ou a total')
+
+      await user.type(screen.getByLabelText('Área total'), '60')
+      expect(gaps).not.toHaveTextContent('Informe a área')
+      expect(gaps).toHaveTextContent('Informe a cidade e o bairro')
+    })
+
+    it('needs a price, then sends it with the consent', async () => {
+      const user = userEvent.setup()
+      const property = makePropertyRecord()
+      const api = fakeApi({ session: makeSession(), properties: [property] })
+      const { router } = renderRoute(`/app/imoveis/${property.id}/editar`)
+
+      await user.click(await screen.findByRole('switch', { name: 'À venda' }))
+      await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Anunciar' }))
+      await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+      expect(await screen.findByText('Informe o preço de venda.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Preço de venda')).toHaveFocus()
+      expect(api.calls.some((call) => call.method === 'PATCH')).toBe(false)
+
+      await user.type(screen.getByLabelText('Preço de venda'), '450.000')
+      await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+
+      await waitFor(() => expect(router.state.location.pathname).toBe(`/app/imoveis/${property.id}`))
+      expect(api.calls.find((call) => call.method === 'PATCH')?.body).toMatchObject({
+        forSale: { priceCents: 45_000_000, consent: true },
+      })
+    })
+
+    it('does not ask again for a property that is already for sale', async () => {
+      const user = userEvent.setup()
+      const property = makePropertyRecord({
+        forSale: { priceCents: 45_000_000, consentedAt: '2026-11-01T10:00:00.000Z', status: 'live', missing: [] },
+      })
+      const api = fakeApi({ session: makeSession(), properties: [property] })
+      renderRoute(`/app/imoveis/${property.id}/editar`)
+
+      const toggle = await screen.findByRole('switch', { name: 'À venda' })
+      expect(toggle).toBeChecked()
+      expect(screen.getByLabelText('Preço de venda')).toHaveValue('450.000,00')
+
+      await user.click(toggle)
+      expect(toggle).not.toBeChecked()
+      await user.click(toggle)
+      expect(toggle).toBeChecked()
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+      await waitFor(() => expect(api.calls.some((call) => call.method === 'PATCH')).toBe(true))
+    })
+  })
+
   it('links to the form from the list and from the property', async () => {
     const property = makePropertyRecord()
     fakeApi({ session: makeSession(), properties: [property] })
