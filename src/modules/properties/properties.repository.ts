@@ -35,6 +35,9 @@ const select = {
   occupancyRate: true,
   rentalMode: true,
   notes: true,
+  listingPriceCents: true,
+  listingConsentedAt: true,
+  listingHiddenAt: true,
   createdAt: true,
   updatedAt: true,
   address: {
@@ -80,6 +83,8 @@ const select = {
   insurance: { select: { description: true } },
   /** Only used to derive the status. */
   contracts: { where: { status: "active" }, select: { id: true }, take: 1 },
+  /** Only used to derive the listing status. */
+  _count: { select: { photos: true } },
 } satisfies Prisma.PropertySelect;
 
 export type PropertyRecord = Prisma.PropertyGetPayload<{ select: typeof select }>;
@@ -112,6 +117,10 @@ export interface PropertyData {
   notes: string | null;
   clientId: string | null;
   agencyId: string | null;
+  /** Asking price of the for-sale listing; `null` = not for sale. */
+  listingPriceCents: bigint | null;
+  /** When the owner consented to the listing; set together with the price. */
+  listingConsentedAt: Date | null;
 }
 
 export interface AddressData {

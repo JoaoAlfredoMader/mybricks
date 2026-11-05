@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { AuditAction, AuditEntityType } from "../../generated/prisma/enums.js";
 import { clientIp } from "../../modules/audit/audit.recorder.js";
 import type { AppEnv } from "./app-env.js";
@@ -6,6 +6,39 @@ import type { AppEnv } from "./app-env.js";
 export interface AuditedOptions {
   /** A platform-level event (not tied to the organization the operator happens to be in). */
   platformLevel?: boolean;
+}
+
+export interface AuditEntry extends AuditedOptions {
+  action: AuditAction;
+  entityType: AuditEntityType;
+  entityId: string | null;
+  /** Written next to the request (`method`, `path`, `status`) in the entry's details. */
+  details?: Record<string, unknown>;
+  /** The status the request answers with; defaults to the current response's. */
+  status?: number;
+}
+
+/** Leaves a trace of the current request's caller doing something. Does nothing without a session. */
+export async function recordAudit(c: Context<AppEnv>, entry: AuditEntry): Promise<void> {
+  const auth = c.get("auth");
+  if (!auth) return;
+
+  await c.get("audit").record({
+    action: entry.action,
+    entityType: entry.entityType,
+    entityId: entry.entityId,
+    details: JSON.stringify({
+      method: c.req.method,
+      path: new URL(c.req.url).pathname,
+      status: entry.status ?? c.res.status,
+      ...entry.details,
+    }),
+    organizationId: entry.platformLevel ? null : auth.organizationId,
+    actor: { id: auth.user.id, name: auth.user.name, email: auth.user.email, role: auth.memberRole },
+    impersonatedById: auth.impersonatedById,
+    ipAddress: clientIp(c.req.raw.headers),
+    userAgent: c.req.header("user-agent") ?? null,
+  });
 }
 
 /**
@@ -21,8 +54,7 @@ export function audited(
   return async (c, next) => {
     await next();
 
-    const auth = c.get("auth");
-    if (!auth || c.res.status < 200 || c.res.status >= 300) return;
+    if (!c.get("auth") || c.res.status < 200 || c.res.status >= 300) return;
 
     let entityId: string | null = c.req.param("id") ?? null;
     if (!entityId) {
@@ -35,16 +67,6 @@ export function audited(
       }
     }
 
-    await c.get("audit").record({
-      action,
-      entityType,
-      entityId,
-      details: JSON.stringify({ method: c.req.method, path: new URL(c.req.url).pathname, status: c.res.status }),
-      organizationId: options.platformLevel ? null : auth.organizationId,
-      actor: { id: auth.user.id, name: auth.user.name, email: auth.user.email, role: auth.memberRole },
-      impersonatedById: auth.impersonatedById,
-      ipAddress: clientIp(c.req.raw.headers),
-      userAgent: c.req.header("user-agent") ?? null,
-    });
+    await recordAudit(c, { action, entityType, entityId, ...options });
   };
 }

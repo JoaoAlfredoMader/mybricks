@@ -68,6 +68,14 @@ export const propertyStatusSchema = z
   .enum(["own_use", "loan_for_use", "rented", "vacant"])
   .describe("Derived, never stored: own use and loan for use follow the usage; otherwise rented when there is a tenant, rent or an active contract");
 
+export const listingStatusSchema = z
+  .enum(["pending", "live", "hidden"])
+  .describe("Derived, never stored: `hidden` when the platform admin took the listing down (it wins over the rest), `pending` while `missing` is not empty, else `live` (public)");
+
+export const listingGapSchema = z
+  .enum(["photo", "address", "area"])
+  .describe("`photo`: no photo yet. `address`: no address, or no neighborhood in it. `area`: neither a private nor a total area");
+
 export const propertySchema = output(
   "Property",
   z.object({
@@ -133,6 +141,14 @@ export const propertySchema = output(
       }),
     ),
     insurance: nullable(z.object({ description: nullable(z.string()) })).describe("A value means the property is insured"),
+    forSale: nullable(
+      z.object({
+        priceCents: cents.describe("Asking price in integer cents (BRL); the listing never shows the estimated value"),
+        consentedAt: timestamp.describe("When the owner agreed to publish the property as a listing; editing the price does not renew it"),
+        status: listingStatusSchema,
+        missing: z.array(listingGapSchema).describe("What is still needed to go live; empty when nothing is missing"),
+      }),
+    ).describe("A value means the property is for sale, and so a public listing once it is complete"),
     createdById: z.string(),
     createdAt: timestamp,
     updatedAt: timestamp,

@@ -10,6 +10,7 @@ import type {
 import { centsToNumber } from "../../shared/money.js";
 import type { FinancingSummary, Installment } from "./financing-schedule.js";
 import type { PropertyRecord } from "./properties.repository.js";
+import { type ListingGap, type ListingStatus, deriveListingState } from "./listing-status.js";
 import { derivePropertyStatus, type PropertyStatus } from "./property-status.js";
 
 export interface PropertyAddressDto {
@@ -23,6 +24,17 @@ export interface PropertyAddressDto {
   neighborhood: string | null;
   latitude: number | null;
   longitude: number | null;
+}
+
+/** A property offered for sale, and where its public listing stands. */
+export interface ForSaleDto {
+  priceCents: number;
+  /** When the owner agreed to publish the property; editing the price does not renew it. */
+  consentedAt: string;
+  /** Derived: `hidden` by the platform admin, `pending` while something is missing, else `live`. */
+  status: ListingStatus;
+  /** What is still needed to go live; empty when nothing is missing. */
+  missing: ListingGap[];
 }
 
 /** Shape returned by the API. Money is integer cents, decimals are numbers, dates are ISO strings. */
@@ -74,6 +86,8 @@ export interface PropertyDto {
   } | null;
   /** A row means the property is insured. */
   insurance: { description: string | null } | null;
+  /** Set when the property is offered for sale (and so shown as a public listing once complete). */
+  forSale: ForSaleDto | null;
   createdById: string;
   createdAt: string;
   updatedAt: string;
@@ -98,6 +112,23 @@ export interface Page<TItem> {
 }
 
 const decimal = (value: { toNumber(): number } | null) => (value === null ? null : value.toNumber());
+
+function toForSaleDto(record: PropertyRecord): ForSaleDto | null {
+  if (record.listingPriceCents === null || record.listingConsentedAt === null) return null;
+  const { status, missing } = deriveListingState({
+    hiddenAt: record.listingHiddenAt,
+    photoCount: record._count.photos,
+    address: record.address && { neighborhood: record.address.neighborhood },
+    privateArea: record.privateArea,
+    totalArea: record.totalArea,
+  });
+  return {
+    priceCents: centsToNumber(record.listingPriceCents),
+    consentedAt: record.listingConsentedAt.toISOString(),
+    status,
+    missing,
+  };
+}
 
 export function toPropertyDto(record: PropertyRecord): PropertyDto {
   const { address, manualRental } = record;
@@ -165,6 +196,7 @@ export function toPropertyDto(record: PropertyRecord): PropertyDto {
       : null,
     legalRecord: record.legalRecord,
     insurance: record.insurance,
+    forSale: toForSaleDto(record),
     createdById: record.createdById,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),

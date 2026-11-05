@@ -6019,6 +6019,56 @@
             ],
             "description": "A value means the property is insured"
           },
+          "forSale": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "priceCents": {
+                    "type": "integer",
+                    "description": "Asking price in integer cents (BRL); the listing never shows the estimated value"
+                  },
+                  "consentedAt": {
+                    "type": "string",
+                    "description": "When the owner agreed to publish the property as a listing; editing the price does not renew it"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "live",
+                      "hidden"
+                    ],
+                    "description": "Derived, never stored: `hidden` when the platform admin took the listing down (it wins over the rest), `pending` while `missing` is not empty, else `live` (public)"
+                  },
+                  "missing": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "photo",
+                        "address",
+                        "area"
+                      ],
+                      "description": "`photo`: no photo yet. `address`: no address, or no neighborhood in it. `area`: neither a private nor a total area"
+                    },
+                    "description": "What is still needed to go live; empty when nothing is missing"
+                  }
+                },
+                "required": [
+                  "priceCents",
+                  "consentedAt",
+                  "status",
+                  "missing"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A value means the property is for sale, and so a public listing once it is complete"
+          },
           "createdById": {
             "type": "string"
           },
@@ -6062,6 +6112,7 @@
           "financing",
           "legalRecord",
           "insurance",
+          "forSale",
           "createdById",
           "createdAt",
           "updatedAt"
@@ -8683,6 +8734,34 @@
                 "type": "null"
               }
             ]
+          },
+          "forSale": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "priceCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "consent": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -9197,6 +9276,34 @@
                   "amortizationSystem",
                   "firstInstallmentOn"
                 ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "forSale": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "priceCents": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "consent": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                }
               },
               {
                 "type": "null"

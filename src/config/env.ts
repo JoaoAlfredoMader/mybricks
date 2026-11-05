@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** MyBricks' own WhatsApp (48 99180-2046), in `wa.me` format. */
+export const DEFAULT_LISTINGS_WHATSAPP_NUMBER = "5548991802046";
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -30,6 +33,11 @@ const envSchema = z
     MAINTENANCE_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),
     /** Largest accepted upload, in megabytes. */
     MAX_UPLOAD_MB: z.coerce.number().positive().max(100).default(15),
+    /** The platform's WhatsApp, where every listing card leads (`wa.me` format: country code + area code + number, digits only). */
+    LISTINGS_WHATSAPP_NUMBER: z
+      .string()
+      .regex(/^\d{12,13}$/, "LISTINGS_WHATSAPP_NUMBER must have 12 or 13 digits (country code, area code and number, digits only)")
+      .default(DEFAULT_LISTINGS_WHATSAPP_NUMBER),
   })
   .superRefine((env, context) => {
     if (env.STORAGE_DRIVER !== "s3") return;

@@ -83,6 +83,18 @@ const financingSchema = z.object({
   firstInstallmentOn: date,
 });
 
+/**
+ * Marks the property as for sale. Sending it is the owner's consent to show the property as a
+ * public listing. The two fields are accepted loosely on purpose: a missing consent, a zero or
+ * missing price are business rules (422), answered by the service, not malformed input.
+ */
+const forSaleSchema = z.object({
+  /** Asking price in integer cents; must be greater than zero. Never the estimated value. */
+  priceCents: z.number().int().max(Number.MAX_SAFE_INTEGER).nullish(),
+  /** Must be `true`: the owner agrees to publish the property as a listing. */
+  consent: z.boolean().nullish(),
+});
+
 const manualRentalSchema = z.object({
   tenantName: optionalText(z.string().trim().max(255)),
   monthlyRentCents: cents.default(0),
@@ -127,6 +139,7 @@ export const createPropertySchema = z.object({
   legalRecord: legalRecordSchema.nullish(),
   insurance: insuranceSchema.nullish(),
   financing: financingSchema.nullish(),
+  forSale: forSaleSchema.nullish(),
 });
 
 /** `null` on a nullable field clears it; on `address` / `manualRental` / `acquisition` it removes the child. */
@@ -139,6 +152,8 @@ export const updatePropertySchema = z
     legalRecord: legalRecordSchema.nullable(),
     insurance: insuranceSchema.nullable(),
     financing: financingSchema.nullable(),
+    /** `null` takes the property off the market: price and consent are cleared. */
+    forSale: forSaleSchema.nullable(),
   })
   .partial()
   .refine((patch) => Object.values(patch).some((value) => value !== undefined), {

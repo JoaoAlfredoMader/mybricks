@@ -22,11 +22,20 @@ import type {
   UpdatePropertyInput,
 } from "./properties.schemas.js";
 
+/** What a write did to the for-sale listing: the route leaves a trace of it in the audit log. */
+export type ListingChange = "enabled" | "disabled";
+
+export interface PropertyWrite {
+  property: PropertyDto;
+  /** `null` when the write did not turn the listing on or off (a price edit is neither). */
+  listingChange: ListingChange | null;
+}
+
 export interface PropertiesService {
   list(tenant: TenantScope, query: ListPropertiesInput): Promise<Page<PropertyDto>>;
   get(tenant: TenantScope, id: string): Promise<PropertyDto>;
-  create(tenant: TenantScope, input: CreatePropertyInput): Promise<PropertyDto>;
-  update(tenant: TenantScope, id: string, input: UpdatePropertyInput): Promise<PropertyDto>;
+  create(tenant: TenantScope, input: CreatePropertyInput): Promise<PropertyWrite>;
+  update(tenant: TenantScope, id: string, input: UpdatePropertyInput): Promise<PropertyWrite>;
   remove(tenant: TenantScope, id: string): Promise<void>;
   /** Installments and balance of the property's financing; `asOf` defaults to today. */
   financingSchedule(tenant: TenantScope, id: string, options: { asOf?: string | undefined }): Promise<FinancingScheduleDto>;
@@ -103,6 +112,27 @@ function toManualRentalData(input: NonNullable<CreatePropertyInput["manualRental
     monthlyRentCents: numberToCents(input.monthlyRentCents),
     dueDay: input.dueDay ?? null,
   };
+}
+
+type ForSaleInput = NonNullable<CreatePropertyInput["forSale"]>;
+
+/**
+ * Putting a property up for sale is the owner's consent to show it as a public listing, so both the
+ * consent and a real price are required every time `forSale` is sent. These are business rules (422),
+ * not malformed input.
+ */
+function assertCanSell(forSale: ForSaleInput): bigint {
+  const errors: FieldError[] = [];
+  if (forSale.consent !== true) {
+    errors.push({ path: "forSale.consent", message: "The owner must consent to publish the property as a listing" });
+  }
+  if (forSale.priceCents == null || forSale.priceCents <= 0) {
+    errors.push({ path: "forSale.priceCents", message: "A sale price greater than zero is required" });
+  }
+  if (errors.length > 0 || forSale.priceCents == null) {
+    throw AppError.businessRule("The property cannot be put up for sale", errors);
+  }
+  return numberToCents(forSale.priceCents);
 }
 
 interface RuleSubject {
@@ -198,7 +228,13 @@ export function createPropertiesService(repository: PropertiesRepository): Prope
         notes: input.notes ?? null,
         clientId: input.clientId ?? null,
         agencyId: input.agencyId ?? null,
+        listingPriceCents: null,
+        listingConsentedAt: null,
       };
+      if (input.forSale) {
+        data.listingPriceCents = assertCanSell(input.forSale);
+        data.listingConsentedAt = new Date();
+      }
 
       assertNoErrors([
         ...(await checkConsistency(data, Boolean(input.manualRental))),
@@ -226,7 +262,7 @@ export function createPropertiesService(repository: PropertiesRepository): Prope
         data,
         children,
       );
-      return toPropertyDto(created);
+      return { property: toPropertyDto(created), listingChange: input.forSale ? "enabled" : null };
     },
 
     async update(tenant, id, input) {
@@ -241,6 +277,7 @@ export function createPropertiesService(repository: PropertiesRepository): Prope
         legalRecord,
         insurance,
         financing,
+        forSale,
         estimatedValueCents,
         annualExpensesCents,
         ...scalars
@@ -254,6 +291,23 @@ export function createPropertiesService(repository: PropertiesRepository): Prope
         patch.estimatedValueCents = estimatedValueCents === null ? null : numberToCents(estimatedValueCents);
       }
       if (annualExpensesCents !== undefined) patch.annualExpensesCents = numberToCents(annualExpensesCents);
+
+      // `undefined` leaves the listing alone. `null` takes it off the market: the price and the consent go,
+      // but not the moderation (`listingHiddenAt`), or turning it on again would undo the admin's decision.
+      // Editing the price of a listing that is already on keeps the original consent and its date.
+      const wasForSale = current.listingPriceCents !== null;
+      let listingChange: ListingChange | null = null;
+      if (forSale === null) {
+        patch.listingPriceCents = null;
+        patch.listingConsentedAt = null;
+        if (wasForSale) listingChange = "disabled";
+      } else if (forSale !== undefined) {
+        patch.listingPriceCents = assertCanSell(forSale);
+        if (!wasForSale) {
+          patch.listingConsentedAt = new Date();
+          listingChange = "enabled";
+        }
+      }
 
       const rentalMode = patch.rentalMode ?? current.rentalMode;
       // The financing rule is checked on the state after the write, even when only one side is sent.
@@ -292,7 +346,7 @@ export function createPropertiesService(repository: PropertiesRepository): Prope
       };
       const updated = await repository.update(scope, id, patch, children);
       if (!updated) throw AppError.notFound("Property not found");
-      return toPropertyDto(updated);
+      return { property: toPropertyDto(updated), listingChange };
     },
 
     async remove(tenant, id) {
