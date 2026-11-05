@@ -46,6 +46,24 @@ describe('Properties list', () => {
     expect(within(casa).getByRole('rowheader')).toHaveTextContent('São Paulo, SP')
   })
 
+  it('tags the properties that are for sale', async () => {
+    fakeApi({
+      session: makeSession(),
+      properties: [
+        makePropertyRecord({ name: 'Apartamento Centro' }),
+        makePropertyRecord({
+          name: 'Casa de Praia',
+          forSale: { priceCents: 90_000_000, consentedAt: '2026-11-01T15:00:00.000Z', status: 'live', missing: [] },
+        }),
+      ],
+    })
+    renderRoute('/app/imoveis')
+
+    const rows = within(await screen.findByRole('table')).getAllByRole('row').slice(1)
+    expect(within(rows[0]!).queryByText('À venda')).not.toBeInTheDocument()
+    expect(within(rows[1]!).getByText('À venda')).toBeInTheDocument()
+  })
+
   it('searches by name a moment after typing, and keeps it in the URL', async () => {
     const user = userEvent.setup()
     const api = fakeApi({ session: makeSession(), properties: portfolio() })

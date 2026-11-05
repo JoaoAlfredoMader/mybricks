@@ -73,6 +73,63 @@ describe('Property detail', () => {
     expect(screen.queryByRole('region', { name: 'Observações' })).not.toBeInTheDocument()
   })
 
+  describe('listing', () => {
+    const forSale = (overrides: Partial<NonNullable<ReturnType<typeof makePropertyRecord>['forSale']>>) => ({
+      priceCents: 45_000_000,
+      consentedAt: '2026-11-01T15:00:00.000Z',
+      status: 'live' as const,
+      missing: [],
+      ...overrides,
+    })
+
+    it('shows nothing about a sale when the property is not for sale', async () => {
+      const property = makePropertyRecord()
+      fakeApi({ session: makeSession(), properties: [property] })
+      renderRoute(`/app/imoveis/${property.id}`)
+
+      await screen.findByRole('heading', { level: 1, name: 'Apartamento Centro' })
+      expect(screen.queryByRole('region', { name: 'Anúncio' })).not.toBeInTheDocument()
+      expect(screen.queryByText('À venda')).not.toBeInTheDocument()
+    })
+
+    it('shows a live listing with its price', async () => {
+      const property = makePropertyRecord({ forSale: forSale({}) })
+      fakeApi({ session: makeSession(), properties: [property] })
+      renderRoute(`/app/imoveis/${property.id}`)
+
+      await screen.findByRole('heading', { level: 1, name: 'Apartamento Centro' })
+      expect(screen.getByText('À venda')).toBeInTheDocument()
+      expect(card('Anúncio')).toMatchObject({ Situação: 'No ar', Preço: 'R$ 450.000,00' })
+    })
+
+    it('lists what a pending listing lacks, with the way to fix it', async () => {
+      const property = makePropertyRecord({ forSale: forSale({ status: 'pending', missing: ['photo', 'area'] }) })
+      fakeApi({ session: makeSession(), properties: [property] })
+      renderRoute(`/app/imoveis/${property.id}`)
+
+      await screen.findByRole('heading', { level: 1, name: 'Apartamento Centro' })
+      const section = screen.getByRole('region', { name: 'Anúncio' })
+      expect(card('Anúncio')).toMatchObject({ Situação: 'Pendente' })
+      expect(within(section).getByText('Ao menos uma foto')).toBeInTheDocument()
+      expect(within(section).getByText('A área do imóvel')).toBeInTheDocument()
+      expect(within(section).queryByText('Cidade e bairro')).not.toBeInTheDocument()
+      expect(within(section).getByRole('link', { name: 'Adicionar fotos' })).toHaveAttribute('href', `/app/imoveis/${property.id}#photos-title`)
+      expect(within(section).getByRole('link', { name: 'Editar o imóvel' })).toHaveAttribute('href', `/app/imoveis/${property.id}/editar`)
+    })
+
+    it('says the platform hid it, with no promise of when it returns', async () => {
+      const property = makePropertyRecord({ forSale: forSale({ status: 'hidden' }) })
+      fakeApi({ session: makeSession(), properties: [property] })
+      renderRoute(`/app/imoveis/${property.id}`)
+
+      await screen.findByRole('heading', { level: 1, name: 'Apartamento Centro' })
+      const section = screen.getByRole('region', { name: 'Anúncio' })
+      expect(card('Anúncio')).toMatchObject({ Situação: 'Oculto pelo administrador' })
+      expect(section).toHaveTextContent('A plataforma ocultou este anúncio')
+      expect(within(section).queryByRole('link')).not.toBeInTheDocument()
+    })
+  })
+
   it('says so when the property is not in this portfolio', async () => {
     fakeApi({ session: makeSession(), properties: [] })
     renderRoute('/app/imoveis/00000000-0000-4000-8000-999999999999')

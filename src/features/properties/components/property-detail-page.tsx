@@ -22,7 +22,9 @@ import {
 import { useDeleteProperty } from '../hooks/use-property-mutations'
 import { DocumentList } from './document-list'
 import { FinancingSection } from './financing-section'
+import { ListingStatusCard } from './listing-status-card'
 import { PhotoGallery } from './photo-gallery'
+import { SaleBadge } from './sale-badge'
 import { StatusBadge } from './status-badge'
 
 const REVENUE_SOURCE: Record<PropertyKpis['revenueSource'], string> = {
@@ -113,6 +115,7 @@ export function PropertyDetailPage({ property, kpis, catalog, clientName, canDel
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {property.forSale && <SaleBadge />}
           <span className="rounded-full border bg-card px-3.5 py-2 text-sm">
             <StatusBadge status={property.status} />
           </span>
@@ -158,6 +161,12 @@ export function PropertyDetailPage({ property, kpis, catalog, clientName, canDel
           />
         </dl>
       </section>
+
+      {property.forSale && (
+        <div className="mt-4">
+          <ListingStatusCard propertyId={property.id} forSale={property.forSale} />
+        </div>
+      )}
 
       <div className="mt-4">
         <PhotoGallery propertyId={property.id} propertyName={property.name} canDelete={canDelete} />

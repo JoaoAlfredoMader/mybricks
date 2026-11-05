@@ -9,6 +9,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { formatArea, formatWholeMoney } from '@/lib/format'
 import { type PropertyFilters, propertiesQueryOptions, propertyCatalogQueryOptions } from '../api/queries'
 import { PROPERTY_TYPE_LABEL, USAGE_LABEL } from '../lib/labels'
+import { SaleBadge } from './sale-badge'
 import { StatusBadge } from './status-badge'
 
 interface PropertiesPageProps {
@@ -108,6 +109,11 @@ export function PropertiesPage({ filters, onFiltersChange }: PropertiesPageProps
                       <td className="px-4 py-3">{USAGE_LABEL[property.usageType]}</td>
                       <td className="px-4 py-3">
                         <StatusBadge status={property.status} />
+                        {property.forSale && (
+                          <span className="mt-1 block">
+                            <SaleBadge />
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
                         {area === null ? '—' : formatArea(area)}
