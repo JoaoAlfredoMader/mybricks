@@ -111,6 +111,7 @@ export function makePropertyRecord(overrides: Partial<Property> = {}): Property 
     estimatedValueCents: 68_000_000,
     annualExpensesCents: 540_000,
     occupancyRate: 95,
+    forSale: null,
     rentalMode: 'contract',
     notes: null,
     clientId: null,
@@ -768,7 +769,12 @@ export function fakeApi({
 
   /** A request body as the API would store it: the address gets its city's name back. */
   function stored(body: unknown): Partial<Property> {
-    const { address, ...rest } = body as PropertyRequestBody
+    const { address, forSale, ...request } = body as PropertyRequestBody
+    // The sale comes back as the API derives it: when it was agreed to and where it stands.
+    const rest = {
+      ...request,
+      forSale: forSale ? { priceCents: forSale.priceCents ?? 0, consentedAt: '2026-11-05T12:00:00.000Z', status: 'pending', missing: ['photo'] } : null,
+    }
     if (!address) return { ...rest, address: null } as Partial<Property>
     const city = CITIES.find((c) => c.ibgeCode === address.cityId)
     return {

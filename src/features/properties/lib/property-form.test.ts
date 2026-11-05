@@ -5,6 +5,7 @@ import {
   apiMessageInPortuguese,
   EMPTY_PROPERTY_FORM,
   fromProperty,
+  listingGaps,
   propertyFormSchema,
   type PropertyFormValues,
   toPropertyRequest,
@@ -162,6 +163,7 @@ describe('property form', () => {
       estimatedValueCents: 68_000_050,
       annualExpensesCents: 540_000,
       occupancyRate: 95,
+      forSale: null,
       rentalMode: 'contract',
       manualRental: null,
       acquisition: { acquisitionType: 'purchase', acquiredOn: '2021-05-14', costCents: 52_000_000 },
@@ -172,6 +174,41 @@ describe('property form', () => {
       agencyId: null,
       notes: null,
     })
+  })
+
+  it('asks for a price above zero when the property is for sale, and sends it with the consent', () => {
+    const forSale = { ...minimal, forSale: true }
+    expect(errors(forSale)).toEqual({ salePrice: 'Informe o preço de venda.' })
+    expect(errors({ ...forSale, salePrice: '0,00' })).toEqual({ salePrice: 'O preço precisa ser maior que zero.' })
+    expect(errors({ ...forSale, salePrice: '450,123' })).toEqual({ salePrice: 'Use um valor como 450.000,00.' })
+
+    const priced = { ...forSale, salePrice: '450.000,50' }
+    expect(errors(priced)).toEqual({})
+    expect(toPropertyRequest(priced).forSale).toEqual({ priceCents: 45_000_050, consent: true })
+  })
+
+  it('ignores a price typed before the switch was turned off', () => {
+    const off = { ...minimal, forSale: false, salePrice: 'abc' }
+    expect(errors(off)).toEqual({})
+    expect(toPropertyRequest(off).forSale).toBeNull()
+  })
+
+  it('brings a property already for sale back with the switch on and its price', () => {
+    const property = makePropertyRecord({
+      forSale: { priceCents: 45_000_000, consentedAt: '2026-11-01T10:00:00.000Z', status: 'live', missing: [] },
+    })
+    const values = fromProperty(property)
+    expect(values).toMatchObject({ forSale: true, salePrice: '450.000,00' })
+    expect(toPropertyRequest(values).forSale).toEqual({ priceCents: 45_000_000, consent: true })
+    expect(fromProperty(makePropertyRecord())).toMatchObject({ forSale: false, salePrice: '' })
+  })
+
+  it('lists what the form already knows a listing lacks', () => {
+    expect(listingGaps(minimal)).toEqual(['address', 'area'])
+    const city = { id: 3550308, name: 'São Paulo', state: 'SP' }
+    expect(listingGaps({ ...minimal, city, street: 'Rua A', neighborhood: ' ', totalArea: '60' })).toEqual(['address'])
+    expect(listingGaps({ ...minimal, city, neighborhood: 'Centro', privateArea: '0', totalArea: '' })).toEqual(['area'])
+    expect(listingGaps({ ...minimal, city, neighborhood: 'Centro', totalArea: '60' })).toEqual([])
   })
 
   it('translates the rule messages the API sends', () => {

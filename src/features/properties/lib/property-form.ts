@@ -47,6 +47,8 @@ export interface PropertyFormValues {
   estimatedValue: string
   annualExpenses: string
   occupancyRate: string
+  forSale: boolean
+  salePrice: string
   rentalMode: 'manual' | 'contract'
   tenantName: string
   monthlyRent: string
@@ -97,6 +99,8 @@ export const EMPTY_PROPERTY_FORM: PropertyFormValues = {
   estimatedValue: '',
   annualExpenses: '',
   occupancyRate: '90',
+  forSale: false,
+  salePrice: '',
   rentalMode: 'manual',
   tenantName: '',
   monthlyRent: '',
@@ -139,6 +143,17 @@ function hasAddress(values: PropertyFormValues) {
   return values.city !== null || ADDRESS_FIELDS.some((field) => values[field].trim() !== '')
 }
 
+/** What a listing still needs that the form can see; the photos are only known once the property exists. */
+export type ListingGap = 'address' | 'area'
+
+export function listingGaps(values: PropertyFormValues): ListingGap[] {
+  const gaps: ListingGap[] = []
+  if (!values.city || values.neighborhood.trim() === '') gaps.push('address')
+  const area = parseDecimal(values.privateArea) ?? parseDecimal(values.totalArea)
+  if (!area || area <= 0) gaps.push('area')
+  return gaps
+}
+
 export function fromProperty(property: Property): PropertyFormValues {
   const { address, manualRental, acquisition, financing, legalRecord, insurance } = property
   return {
@@ -165,6 +180,8 @@ export function fromProperty(property: Property): PropertyFormValues {
     estimatedValue: moneyToInput(property.estimatedValueCents),
     annualExpenses: moneyToInput(property.annualExpensesCents),
     occupancyRate: decimalToInput(property.occupancyRate),
+    forSale: property.forSale !== null,
+    salePrice: moneyToInput(property.forSale?.priceCents),
     rentalMode: property.rentalMode,
     tenantName: manualRental?.tenantName ?? '',
     monthlyRent: moneyToInput(manualRental?.monthlyRentCents),
@@ -263,6 +280,13 @@ export function propertyFormSchema(catalog: PropertyCatalog | undefined) {
       issue('dueDay', rangeCheck(parseInteger, 1, 31, 'Use um dia do mês.')(values.dueDay))
     }
 
+    if (values.forSale) {
+      const price = parseMoney(values.salePrice)
+      if (price === null) issue('salePrice', 'Informe o preço de venda.')
+      else if (price === undefined) issue('salePrice', 'Use um valor como 450.000,00.')
+      else if (price <= 0) issue('salePrice', 'O preço precisa ser maior que zero.')
+    }
+
     if (values.acquisitionType) {
       issue('acquiredOn', date(values.acquiredOn))
       issue('acquisitionCost', money(values.acquisitionCost))
@@ -329,6 +353,7 @@ export function toPropertyRequest(values: PropertyFormValues): PropertyRequest {
     estimatedValueCents: num(parseMoney(values.estimatedValue)),
     annualExpensesCents: parseMoney(values.annualExpenses) ?? 0,
     occupancyRate: parseDecimal(values.occupancyRate) ?? 0,
+    forSale: values.forSale ? { priceCents: parseMoney(values.salePrice) ?? 0, consent: true } : null,
     rentalMode: income ? values.rentalMode : 'manual',
     manualRental: manual
       ? {
@@ -383,6 +408,8 @@ export const REQUEST_PATH_TO_FIELD: Record<string, keyof PropertyFormValues> = {
   'address.cityId': 'city',
   'address.street': 'street',
   'address.postalCode': 'postalCode',
+  'forSale.priceCents': 'salePrice',
+  'forSale.consent': 'forSale',
   parkingSpotLabel: 'parkingSpotLabel',
   clientId: 'clientId',
   agencyId: 'agencyId',
@@ -404,6 +431,8 @@ const API_MESSAGES: Record<string, string> = {
   'Agency not found': 'Esta imobiliária não existe mais.',
   'Client not found': 'Este cliente não existe mais.',
   'City not found': 'Esta cidade não foi encontrada.',
+  'A sale price greater than zero is required': 'O preço precisa ser maior que zero.',
+  'The owner must consent to publish the property as a listing': 'Confirme que o imóvel pode aparecer como anúncio.',
 }
 
 export function apiMessageInPortuguese(message: string): string {
