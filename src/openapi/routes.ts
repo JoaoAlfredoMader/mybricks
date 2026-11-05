@@ -24,6 +24,12 @@ import {
   updateFeedbackSchema,
 } from "../modules/feedback/feedback.schemas.js";
 import { cashFlowQuerySchema, portfolioQuerySchema, propertyKpisParamSchema, propertyKpisQuerySchema } from "../modules/kpis/kpis.route.js";
+import {
+  listListingsQuerySchema,
+  listingIdParamSchema,
+  propertyIdParamSchema as listingsPropertyIdParamSchema,
+  setListingHiddenSchema,
+} from "../modules/listings/listings.schemas.js";
 import { searchCitiesQuerySchema } from "../modules/lookups/lookups.route.js";
 import { listOccupantsQuerySchema } from "../modules/occupants/occupants.route.js";
 import {
@@ -78,6 +84,7 @@ import {
   transactionPageSchema,
   transactionSchema,
 } from "./schemas/entities.js";
+import { listingModerationSchema, listingsSchema } from "./schemas/listings.js";
 import { cashFlowSchema, financingScheduleSchema, portfolioKpisSchema, propertyKpisSchema } from "./schemas/insights.js";
 import {
   adminFeedbackPageSchema,
@@ -118,6 +125,7 @@ const updateDocument = input("UpdateDocumentRequest", updateDocumentSchema);
 const updateTemplate = input("UpdateContractTemplateRequest", updateTemplateSchema);
 const createFeedback = input("CreateFeedbackRequest", createFeedbackSchema);
 const updateFeedback = input("UpdateFeedbackStatusRequest", updateFeedbackSchema);
+const setListingHidden = input("SetListingHiddenRequest", setListingHiddenSchema);
 
 const ok = (description: string, schema: Operation["response"]["schema"]): Operation["response"] => ({ status: 200, description, schema });
 const created = (description: string, schema: Operation["response"]["schema"]): Operation["response"] => ({ status: 201, description, schema });
@@ -156,11 +164,15 @@ export const OPERATIONS: readonly Operation[] = [
 
   // ── Properties ──
   { id: "listProperties", method: "get", path: "/api/properties", tag: "Properties", summary: "List properties", access: "session", query: listPropertiesQuerySchema, response: ok("A page of properties", propertyPageSchema) },
-  { id: "createProperty", method: "post", path: "/api/properties", tag: "Properties", summary: "Create a property", description: "Address, manual rental, acquisition, financing, legal record and insurance are nested. Cross-field rules are checked: the usage must be allowed for the type, the subtype must belong to it, only parking has a spot label, a financing needs a purchase or construction acquisition.", access: "session", body: createProperty, response: created("The new property", propertySchema) },
+  { id: "createProperty", method: "post", path: "/api/properties", tag: "Properties", summary: "Create a property", description: "Address, manual rental, acquisition, financing, legal record and insurance are nested. Cross-field rules are checked: the usage must be allowed for the type, the subtype must belong to it, only parking has a spot label, a financing needs a purchase or construction acquisition.\n\n**For sale.** `forSale: { priceCents, consent: true }` puts the property up for sale; sending it is the owner's consent to show it as a public listing (see `listListings`). Without `consent: true`, or with a price that is not greater than zero, the answer is `422`. The response carries `forSale` with the derived `status` (`pending` while a photo, a neighborhood or an area is missing, `live` when public, `hidden` when a platform admin took it down) and what is `missing`, so a property can be marked for sale before its photos are uploaded.", access: "session", body: createProperty, response: created("The new property", propertySchema), errors: [422] },
   { id: "getProperty", method: "get", path: "/api/properties/:id", tag: "Properties", summary: "Get a property", access: "session", params: propertyIdParamSchema, response: ok("The property", propertySchema) },
-  { id: "updateProperty", method: "patch", path: "/api/properties/:id", tag: "Properties", summary: "Update a property", description: "Any subset of the fields. `null` clears a nullable field. The nested blocks (address, manualRental, acquisition, financing, legalRecord, insurance) are replaced as a whole, and `null` removes them.", access: "session", params: propertyIdParamSchema, body: updateProperty, response: ok("The updated property", propertySchema) },
+  { id: "updateProperty", method: "patch", path: "/api/properties/:id", tag: "Properties", summary: "Update a property", description: "Any subset of the fields. `null` clears a nullable field. The nested blocks (address, manualRental, acquisition, financing, legalRecord, insurance) are replaced as a whole, and `null` removes them.\n\n**For sale.** `forSale: { priceCents, consent: true }` puts the property up for sale or edits its price (`422` without `consent: true` or with a price that is not greater than zero); editing the price of a property already for sale keeps the original consent and its date (`consentedAt`). `forSale: null` takes it off the market and clears the price and the consent, but not the platform admin's moderation: turning it on again does not undo a `hidden` listing.", access: "session", params: propertyIdParamSchema, body: updateProperty, response: ok("The updated property", propertySchema), errors: [422] },
   { id: "deleteProperty", method: "delete", path: "/api/properties/:id", tag: "Properties", summary: "Delete a property", description: "Removes everything attached to it: contracts, reservations, transactions, proposals, photos and documents.", access: "session", params: propertyIdParamSchema, response: noContent("Deleted") },
   { id: "getFinancingSchedule", method: "get", path: "/api/properties/:id/financing-schedule", tag: "Properties", summary: "Financing schedule", description: "The SAC or Price installments and where the financing stands on `asOf`.", access: "session", params: propertyIdParamSchema, query: financingScheduleQuerySchema, response: ok("The schedule", financingScheduleSchema) },
+
+  // ── Listings (public) ──
+  { id: "listListings", method: "get", path: "/api/listings", tag: "Listings", summary: "The properties for sale", description: "**Public: no session.** The only data that leaves an organization, so it is a whitelist: type, subtype, asking price, area, rooms, built year, conservation state, city, state, neighborhood, photo count and the path of the cover. Never the name, notes, street, number, complement, postal code, coordinates, client, owner, agency, organization, estimated value, expenses, ownership share, financing, rent, documents or any id of an organization or user.\n\nA property is listed when its owner put it up for sale (which is the consent), a platform admin did not hide it, its organization is not a demo workspace and it has at least one photo, a neighborhood (the city comes with the address) and an area. Newest consent first; `limit` defaults to 12, at most 24. `whatsappNumber` is the platform's, where every card leads: the owner's contact is never shown. Cached for a minute.", access: "public", query: listListingsQuerySchema, response: ok("The live listings and the platform's WhatsApp", listingsSchema) },
+  { id: "getListingCover", method: "get", path: "/api/listings/:id/cover", tag: "Listings", summary: "The first photo of a listing", description: "**Public: no session.** The first photo by position, only while the listing is live; a pending, hidden, not-for-sale or unknown property is the same `404`. Served inline with the file's type, `nosniff` and a neutral file name, cached publicly for an hour.", access: "public", params: listingIdParamSchema, response: { status: 200, description: "The image, inline", binary: { contentType: "image/*" } } },
 
   // ── Proposals ──
   { id: "listProposals", method: "get", path: "/api/properties/:propertyId/proposals", tag: "Proposals", summary: "List the proposals of a property", access: "session", params: proposalsPropertyParamSchema, query: listProposalsQuerySchema, response: ok("A page of proposals", proposalPageSchema) },
@@ -230,6 +242,7 @@ export const OPERATIONS: readonly Operation[] = [
   // ── Platform admin ──
   { id: "adminListFeedback", method: "get", path: "/api/admin/feedback", tag: "Platform admin", summary: "Every feedback of every organization", access: "platform-admin", query: listFeedbackQuerySchema, response: ok("A page of feedback with author and organization", adminFeedbackPageSchema) },
   { id: "adminSetFeedbackStatus", method: "patch", path: "/api/admin/feedback/:id", tag: "Platform admin", summary: "Open or resolve a feedback", access: "platform-admin", params: feedbackIdParamSchema, body: updateFeedback, response: ok("The updated feedback", adminFeedbackSchema) },
+  { id: "setListingHidden", method: "patch", path: "/api/admin/listings/:propertyId", tag: "Platform admin", summary: "Hide or show a listing", description: "`{ hidden: true }` takes a for-sale property out of the public listings (its owner still sees it, with status `hidden`); `{ hidden: false }` shows it again. `404` when the property does not exist or is not for sale. The moderation survives the owner turning the sale off and on again. Audited as a platform-level event.", access: "platform-admin", params: listingsPropertyIdParamSchema, body: setListingHidden, response: ok("Where the listing stands now", listingModerationSchema) },
   { id: "adminListAuditLogs", method: "get", path: "/api/admin/audit-logs", tag: "Platform admin", summary: "The whole audit trail", description: "Optionally narrowed to one organization.", access: "platform-admin", query: listAdminAuditLogsQuerySchema, response: ok("A page of audit entries", auditLogPageSchema) },
 ];
 
@@ -240,6 +253,7 @@ export const TAGS: ReadonlyArray<{ name: string; description: string }> = [
   { name: "Clients", description: "The people or companies that own properties" },
   { name: "Agencies", description: "The agencies that manage properties" },
   { name: "Properties", description: "The portfolio" },
+  { name: "Listings", description: "Properties for sale shown to the public, with no session: the only data that leaves an organization" },
   { name: "Proposals", description: "Offers received or made on a property" },
   { name: "Photos", description: "Property photos" },
   { name: "Documents", description: "Property documents" },

@@ -36,6 +36,10 @@
       "description": "The portfolio"
     },
     {
+      "name": "Listings",
+      "description": "Properties for sale shown to the public, with no session: the only data that leaves an organization"
+    },
+    {
       "name": "Proposals",
       "description": "Offers received or made on a property"
     },
@@ -1164,7 +1168,7 @@
           "Properties"
         ],
         "summary": "Create a property",
-        "description": "Address, manual rental, acquisition, financing, legal record and insurance are nested. Cross-field rules are checked: the usage must be allowed for the type, the subtype must belong to it, only parking has a spot label, a financing needs a purchase or construction acquisition.",
+        "description": "Address, manual rental, acquisition, financing, legal record and insurance are nested. Cross-field rules are checked: the usage must be allowed for the type, the subtype must belong to it, only parking has a spot label, a financing needs a purchase or construction acquisition.\n\n**For sale.** `forSale: { priceCents, consent: true }` puts the property up for sale; sending it is the owner's consent to show it as a public listing (see `listListings`). Without `consent: true`, or with a price that is not greater than zero, the answer is `422`. The response carries `forSale` with the derived `status` (`pending` while a photo, a neighborhood or an area is missing, `live` when public, `hidden` when a platform admin took it down) and what is `missing`, so a property can be marked for sale before its photos are uploaded.",
         "security": [
           {
             "sessionCookie": []
@@ -1203,6 +1207,16 @@
           },
           "401": {
             "description": "There is no valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A business rule forbids it",
             "content": {
               "application/json": {
                 "schema": {
@@ -1286,7 +1300,7 @@
           "Properties"
         ],
         "summary": "Update a property",
-        "description": "Any subset of the fields. `null` clears a nullable field. The nested blocks (address, manualRental, acquisition, financing, legalRecord, insurance) are replaced as a whole, and `null` removes them.",
+        "description": "Any subset of the fields. `null` clears a nullable field. The nested blocks (address, manualRental, acquisition, financing, legalRecord, insurance) are replaced as a whole, and `null` removes them.\n\n**For sale.** `forSale: { priceCents, consent: true }` puts the property up for sale or edits its price (`422` without `consent: true` or with a price that is not greater than zero); editing the price of a property already for sale keeps the original consent and its date (`consentedAt`). `forSale: null` takes it off the market and clears the price and the consent, but not the platform admin's moderation: turning it on again does not undo a `hidden` listing.",
         "security": [
           {
             "sessionCookie": []
@@ -1346,6 +1360,16 @@
           },
           "404": {
             "description": "The record does not exist, or it is outside what the caller may see (another organization, or another member's record)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A business rule forbids it",
             "content": {
               "application/json": {
                 "schema": {
@@ -1473,6 +1497,105 @@
           },
           "401": {
             "description": "There is no valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The record does not exist, or it is outside what the caller may see (another organization, or another member's record)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/listings": {
+      "get": {
+        "operationId": "listListings",
+        "tags": [
+          "Listings"
+        ],
+        "summary": "The properties for sale",
+        "description": "**Public: no session.** The only data that leaves an organization, so it is a whitelist: type, subtype, asking price, area, rooms, built year, conservation state, city, state, neighborhood, photo count and the path of the cover. Never the name, notes, street, number, complement, postal code, coordinates, client, owner, agency, organization, estimated value, expenses, ownership share, financing, rent, documents or any id of an organization or user.\n\nA property is listed when its owner put it up for sale (which is the consent), a platform admin did not hide it, its organization is not a demo workspace and it has at least one photo, a neighborhood (the city comes with the address) and an area. Newest consent first; `limit` defaults to 12, at most 24. `whatsappNumber` is the platform's, where every card leads: the owner's contact is never shown. Cached for a minute.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 24
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The live listings and the platform's WhatsApp",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Listings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid: bad input, malformed JSON or a rule that spans several fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/listings/{id}/cover": {
+      "get": {
+        "operationId": "getListingCover",
+        "tags": [
+          "Listings"
+        ],
+        "summary": "The first photo of a listing",
+        "description": "**Public: no session.** The first photo by position, only while the listing is live; a pending, hidden, not-for-sale or unknown property is the same `404`. Served inline with the file's type, `nosniff` and a neutral file name, cached publicly for an hour.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image, inline",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid: bad input, malformed JSON or a rule that spans several fields",
             "content": {
               "application/json": {
                 "schema": {
@@ -5125,6 +5248,94 @@
         }
       }
     },
+    "/api/admin/listings/{propertyId}": {
+      "patch": {
+        "operationId": "setListingHidden",
+        "tags": [
+          "Platform admin"
+        ],
+        "summary": "Hide or show a listing",
+        "description": "`{ hidden: true }` takes a for-sale property out of the public listings (its owner still sees it, with status `hidden`); `{ hidden: false }` shows it again. `404` when the property does not exist or is not for sale. The moderation survives the owner turning the sale off and on again. Audited as a platform-level event.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "propertyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetListingHiddenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Where the listing stands now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingModeration"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid: bad input, malformed JSON or a rule that spans several fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "There is no valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The record does not exist, or it is outside what the caller may see (another organization, or another member's record)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/audit-logs": {
       "get": {
         "operationId": "adminListAuditLogs",
@@ -6852,6 +7063,222 @@
           "page",
           "pageSize",
           "total"
+        ],
+        "additionalProperties": false
+      },
+      "Listing": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The id of the property"
+          },
+          "reference": {
+            "type": "string",
+            "description": "The first 8 characters of the id, in capitals: what the visitor quotes on WhatsApp"
+          },
+          "propertyType": {
+            "type": "string",
+            "enum": [
+              "residential",
+              "commercial",
+              "land",
+              "logistics",
+              "rural",
+              "parking"
+            ]
+          },
+          "subtypeName": {
+            "description": "Apartment, House, Farm... (pt-BR)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "salePriceCents": {
+            "type": "integer",
+            "description": "The asking price in integer cents (BRL), never the estimated value"
+          },
+          "area": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number"
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "m2",
+                  "ha"
+                ]
+              }
+            },
+            "required": [
+              "value",
+              "unit"
+            ],
+            "additionalProperties": false,
+            "description": "The private area, or the total area when there is none. Hectares (`ha`) for rural properties, square meters (`m2`) otherwise"
+          },
+          "bedrooms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "suites": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bathrooms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parkingSpaces": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "builtYear": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conservationState": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "degraded",
+                  "poor",
+                  "regular",
+                  "good",
+                  "excellent"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "city": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "description": "Two-letter state code"
+          },
+          "neighborhood": {
+            "type": "string"
+          },
+          "photoCount": {
+            "type": "integer"
+          },
+          "coverPhotoUrl": {
+            "type": "string",
+            "description": "Path of the public endpoint that serves the first photo (`/api/listings/{id}/cover`)"
+          },
+          "listedAt": {
+            "type": "string",
+            "description": "When the owner agreed to publish the property"
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "propertyType",
+          "subtypeName",
+          "salePriceCents",
+          "area",
+          "bedrooms",
+          "suites",
+          "bathrooms",
+          "parkingSpaces",
+          "builtYear",
+          "conservationState",
+          "city",
+          "state",
+          "neighborhood",
+          "photoCount",
+          "coverPhotoUrl",
+          "listedAt"
+        ],
+        "additionalProperties": false
+      },
+      "Listings": {
+        "type": "object",
+        "properties": {
+          "whatsappNumber": {
+            "type": "string",
+            "description": "The platform's WhatsApp, digits only, in `wa.me` format (country code, area code, number). It is MyBricks' number, never the owner's"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Listing"
+            }
+          }
+        },
+        "required": [
+          "whatsappNumber",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "ListingModeration": {
+        "type": "object",
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "hiddenAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "ISO 8601 timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the listing was taken down; null while it is shown"
+          }
+        },
+        "required": [
+          "propertyId",
+          "hidden",
+          "hiddenAt"
         ],
         "additionalProperties": false
       },
@@ -8741,6 +9168,7 @@
                 "type": "object",
                 "properties": {
                   "priceCents": {
+                    "description": "Asking price in integer cents (BRL); must be greater than zero (422 otherwise). Never the estimated value",
                     "anyOf": [
                       {
                         "type": "integer"
@@ -8751,6 +9179,7 @@
                     ]
                   },
                   "consent": {
+                    "description": "Must be true (422 otherwise): the owner agrees to publish the property as a public listing",
                     "type": [
                       "boolean",
                       "null"
@@ -9288,6 +9717,7 @@
                 "type": "object",
                 "properties": {
                   "priceCents": {
+                    "description": "Asking price in integer cents (BRL); must be greater than zero (422 otherwise). Never the estimated value",
                     "anyOf": [
                       {
                         "type": "integer"
@@ -9298,6 +9728,7 @@
                     ]
                   },
                   "consent": {
+                    "description": "Must be true (422 otherwise): the owner agrees to publish the property as a public listing",
                     "type": [
                       "boolean",
                       "null"
@@ -9932,6 +10363,17 @@
         },
         "required": [
           "status"
+        ]
+      },
+      "SetListingHiddenRequest": {
+        "type": "object",
+        "properties": {
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "hidden"
         ]
       }
     }

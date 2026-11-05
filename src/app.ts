@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
-import type { Env } from "./config/env.js";
+import { DEFAULT_LISTINGS_WHATSAPP_NUMBER, type Env } from "./config/env.js";
 import type { PrismaClient } from "./lib/prisma.js";
 import type { StorageProvider } from "./lib/storage/storage.js";
 import type { Auth } from "./modules/auth/auth.js";
@@ -20,6 +20,7 @@ import { createDocumentsRoutes } from "./modules/documents/documents.route.js";
 import { createAdminFeedbackRoutes, createFeedbackRoutes } from "./modules/feedback/feedback.route.js";
 import { createHealthRoutes } from "./modules/health/health.route.js";
 import { createKpisRoutes } from "./modules/kpis/kpis.route.js";
+import { createAdminListingsRoutes, createListingsRoutes } from "./modules/listings/listings.route.js";
 import { createLookupsRoutes } from "./modules/lookups/lookups.route.js";
 import { createOccupantsRoutes } from "./modules/occupants/occupants.route.js";
 import { createPhotosRoutes } from "./modules/photos/photos.route.js";
@@ -34,7 +35,7 @@ import { blockDeletesWhileImpersonating, loadAuthContext } from "./shared/http/a
 
 export interface AppDependencies {
   prisma: PrismaClient;
-  env: Pick<Env, "FRONTEND_URL"> & Partial<Pick<Env, "NODE_ENV" | "MAX_UPLOAD_MB" | "BETTER_AUTH_URL">>;
+  env: Pick<Env, "FRONTEND_URL"> & Partial<Pick<Env, "NODE_ENV" | "MAX_UPLOAD_MB" | "BETTER_AUTH_URL" | "LISTINGS_WHATSAPP_NUMBER">>;
   auth: Auth;
   provisioning: ProvisioningService;
   audit: AuditRecorder;
@@ -44,6 +45,7 @@ export interface AppDependencies {
 
 export function createApp({ prisma, env, auth, provisioning, audit, storage }: AppDependencies) {
   const maxUploadBytes = (env.MAX_UPLOAD_MB ?? 15) * 1024 * 1024;
+  const listings = { whatsappNumber: env.LISTINGS_WHATSAPP_NUMBER ?? DEFAULT_LISTINGS_WHATSAPP_NUMBER };
   const app = new Hono<AppEnv>();
 
   // Request logs would drown the test output.
@@ -55,6 +57,8 @@ export function createApp({ prisma, env, auth, provisioning, audit, storage }: A
 
   // Better Auth answers on its own; everything else under /api gets the session context.
   app.route("/api/auth", createAuthRoutes(auth));
+  // The public listings need no session, so they are mounted before it is loaded.
+  app.route("/api/listings", createListingsRoutes(prisma, storage, listings));
   app.use("/api/*", loadAuthContext(auth, provisioning));
   app.use("/api/*", blockDeletesWhileImpersonating);
   app.use("/api/*", async (c, next) => {
@@ -64,6 +68,7 @@ export function createApp({ prisma, env, auth, provisioning, audit, storage }: A
   app.route("/api/me", createSessionRoutes());
   app.route("/api/admin/audit-logs", createAdminAuditRoutes(prisma));
   app.route("/api/admin/feedback", createAdminFeedbackRoutes(prisma));
+  app.route("/api/admin/listings", createAdminListingsRoutes(prisma, storage, listings));
   app.route("/api/audit-logs", createAuditRoutes(prisma));
   app.route("/api/agencies", createAgenciesRoutes(prisma));
   app.route("/api/clients", createClientsRoutes(prisma));

@@ -74,9 +74,14 @@ export function assertAcceptable(upload: UploadedFile, policy: UploadPolicy): vo
   }
 }
 
+/** The file extension of a type we accept, without the dot. */
+export function extensionFor(mimeType: string): string | null {
+  return EXTENSIONS[mimeType] ?? null;
+}
+
 /** `<organization>/<uuid>.<ext>`: the name the client sent never reaches the storage. */
 export function storageKeyFor(organizationId: string, mimeType: string): string {
-  const extension = EXTENSIONS[mimeType];
+  const extension = extensionFor(mimeType);
   return `${organizationId}/${randomUUID()}${extension ? `.${extension}` : ""}`;
 }
 

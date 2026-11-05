@@ -90,9 +90,14 @@ const financingSchema = z.object({
  */
 const forSaleSchema = z.object({
   /** Asking price in integer cents; must be greater than zero. Never the estimated value. */
-  priceCents: z.number().int().max(Number.MAX_SAFE_INTEGER).nullish(),
+  priceCents: z
+    .number()
+    .int()
+    .max(Number.MAX_SAFE_INTEGER)
+    .nullish()
+    .describe("Asking price in integer cents (BRL); must be greater than zero (422 otherwise). Never the estimated value"),
   /** Must be `true`: the owner agrees to publish the property as a listing. */
-  consent: z.boolean().nullish(),
+  consent: z.boolean().nullish().describe("Must be true (422 otherwise): the owner agrees to publish the property as a public listing"),
 });
 
 const manualRentalSchema = z.object({
