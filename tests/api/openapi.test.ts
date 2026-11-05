@@ -10,7 +10,7 @@ import { errorResponse } from "../../src/openapi/schemas/common.js";
 import { buildOpenApiDocument } from "../../src/openapi/spec.js";
 import { check } from "../helpers/check.js";
 import { HTML_AS_IMAGE, MIME, PDF, PNG } from "../helpers/fixtures.js";
-import { type ApiResponse, Session, app, env, prisma, resetDatabase } from "../helpers/world.js";
+import { type ApiResponse, Session, app, env, prisma, resetDatabase, signUp } from "../helpers/world.js";
 
 const document = buildOpenApiDocument({ serverUrl: "http://localhost:3000" }) as {
   openapi: string;
@@ -86,6 +86,9 @@ describe("The OpenAPI document", () => {
     const find = (id: string) => Object.values(security(id)).flatMap((path) => Object.values(path)).find((operation) => operation.operationId === id)!;
     expect(find("getHealth").security).toBeUndefined();
     expect(find("listClients").security).toEqual([{ sessionCookie: [] }]);
+    expect(find("listListings").security).toBeUndefined();
+    expect(find("getListingCover").security).toBeUndefined();
+    expect(find("setListingHidden").security).toEqual([{ sessionCookie: [] }]);
   });
 
   it("the committed docs/openapi.json is the current one: run `npm run openapi:export`", () => {
@@ -320,6 +323,36 @@ describe("The API answers what the document promises", () => {
     await api(guest, "PATCH", `${url("documents")}/${document.json.id}`, { category: "registro" });
     await download(guest, document.json.contentUrl, "application/pdf");
     await api(guest, "DELETE", `${url("documents")}/${document.json.id}`);
+  });
+
+  it("the public listings and their moderation", async () => {
+    const visitor = new Session(demo.app);
+    const owner = await signUp("Dona do Imóvel", "dona@example.com");
+    const city = await prisma.city.findFirstOrThrow({ orderBy: { ibgeCode: "asc" } });
+    const created = await api(owner.session, "POST", "/api/properties", {
+      name: "Casa à venda", propertyType: "residential", usageType: "rental", privateArea: 90,
+      address: { cityId: city.ibgeCode, street: "Rua Reservada", neighborhood: "Centro" },
+      forSale: { priceCents: 80_000_000, consent: true },
+    });
+    check("(setup) created for sale: pending until it has a photo", created.json?.forSale?.status === "pending", created.json?.forSale);
+    check("the public list does not have it yet", (await api(visitor, "GET", "/api/listings")).json?.items?.length === 0);
+    check("a pending cover is a documented 404", (await api(visitor, "GET", `/api/listings/${created.json.id}/cover`)).status === 404);
+
+    await upload(owner.session, `/api/properties/${created.json.id}/photos`, { name: "frente.png", type: MIME.png, bytes: PNG });
+    const list = await api(visitor, "GET", "/api/listings?limit=5");
+    check("it is listed now, without a session", list.status === 200 && list.json.items.length === 1 && list.json.items[0].id === created.json.id, list.json);
+    check("an invalid limit is a documented 400", (await api(visitor, "GET", "/api/listings?limit=99")).status === 400);
+    await download(visitor, list.json.items[0].coverPhotoUrl, "image/png");
+
+    check("moderation without a session is a documented 401", (await api(visitor, "PATCH", `/api/admin/listings/${created.json.id}`, { hidden: true })).status === 401);
+    check("moderation by a normal user is a documented 403", (await api(owner.session, "PATCH", `/api/admin/listings/${created.json.id}`, { hidden: true })).status === 403);
+    check("moderation of a property that is not for sale is a documented 404", (await api(admin, "PATCH", `/api/admin/listings/${property.id}`, { hidden: true })).status === 404);
+    const hidden = await api(admin, "PATCH", `/api/admin/listings/${created.json.id}`, { hidden: true });
+    check("the admin hides it", hidden.status === 200 && hidden.json?.hidden === true, hidden.json);
+    check("and it leaves the list", (await api(visitor, "GET", "/api/listings")).json?.items?.length === 0);
+    await api(admin, "PATCH", `/api/admin/listings/${created.json.id}`, { hidden: false });
+    check("a rule of the sale is a documented 422", (await api(owner.session, "PATCH", `/api/properties/${created.json.id}`, { forSale: { priceCents: 0, consent: true } })).status === 422);
+    await api(owner.session, "DELETE", `/api/properties/${created.json.id}`);
   });
 
   it("feedback, the audit trail and the platform admin", async () => {
