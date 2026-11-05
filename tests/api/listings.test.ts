@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, it } from "vitest";
 import { ensurePlatformAdmin } from "../../src/modules/auth/platform-admin.js";
 import { check } from "../helpers/check.js";
 import { JPEG, MIME, PNG } from "../helpers/fixtures.js";
-import { type Account, Session, auth, createCast, prisma, resetDatabase } from "../helpers/world.js";
+import { createContainer } from "../../src/container.js";
+import { type Account, Session, auth, env, createCast, prisma, resetDatabase } from "../helpers/world.js";
 
 const UNKNOWN = "00000000-0000-4000-8000-000000000000";
 const PRICE = 500_000_00;
@@ -387,6 +388,17 @@ describe("Public listings", () => {
     await ana.session.call("PUT", `${photos(apto)}/order`, { photoIds: [second.id, first.id] });
     check("reordering the photos changes the cover", (await new Session().download(cover(apto))).bytes.equals(JPEG));
     check("and the card counts both photos", (await listings()).json.items.find((item: { id: string }) => item.id === apto)?.photoCount === 2);
+  });
+
+  it("answers with the number set in the configuration", async () => {
+    const configured = createContainer({ ...env, LISTINGS_WHATSAPP_NUMBER: "5511987654321" }, { withoutDemoData: true });
+    try {
+      const response = await new Session(configured.app).call("GET", "/api/listings");
+      check("the platform's number comes from LISTINGS_WHATSAPP_NUMBER", response.json?.whatsappNumber === "5511987654321", response.json?.whatsappNumber);
+      check("and it is the same list", response.json?.items?.length === (await live()).length);
+    } finally {
+      await configured.prisma.$disconnect();
+    }
   });
 
   it("leaves a trace of turning a listing on or off, and of moderation", async () => {
