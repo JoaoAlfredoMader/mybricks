@@ -10,6 +10,8 @@
 // - Rules Prisma cannot express (partial unique index, EXCLUDE, CHECKs, lower(email)
 //   index) live in the hand-written migration prisma/migrations/*_manual_constraints.
 //   Prisma does not see them as drift (verified with `prisma migrate diff`).
+//   The same goes for the listing CHECK and the partial index of public listings, in
+//   prisma/migrations/*_property_listings.
 // - Better Auth tables (User, Session, Account, Verification, Organization, Member,
 //   Invitation) follow the organization + admin + anonymous plugins. Re-run
 //   `npx auth@latest generate` and diff before upgrading Better Auth.
@@ -509,6 +511,13 @@ model Property {
   occupancyRate       Decimal            @default(90) @map("occupancy_rate") @db.Decimal(5, 2)
   rentalMode          RentalMode         @default(manual) @map("rental_mode")
   notes               String?
+  /// Asking price of a for-sale listing; null = not for sale. The only data that leaves the organization (public listings).
+  /// CHECK > 0 and requires listingConsentedAt (manual constraints migration). Never the estimated value.
+  listingPriceCents   BigInt?            @map("listing_price_cents")
+  /// When the owner agreed to publish the property as a listing. Set when turned on, kept while only the price changes.
+  listingConsentedAt  DateTime?          @map("listing_consented_at") @db.Timestamptz(6)
+  /// Moderation by the platform admin. Kept when the owner turns the listing off, so turning it on again does not undo it.
+  listingHiddenAt     DateTime?          @map("listing_hidden_at") @db.Timestamptz(6)
   createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
