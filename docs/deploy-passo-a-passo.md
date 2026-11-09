@@ -6,7 +6,8 @@ O código já está pronto (ver [deploy-cloudflare.md](deploy-cloudflare.md) par
 
 1. Crie a conta em cloudflare.com e confirme o e-mail.
 2. **Add a domain** → `mybricks.com.br` → plano **Free**. A Cloudflare mostra dois *nameservers* (algo como `xxx.ns.cloudflare.com`).
-3. No **Registro.br** (Painel → o domínio → DNS → *Alterar servidores DNS*), troque os servidores pelos dois da Cloudflare. A ativação leva de minutos a algumas horas; a Cloudflare avisa por e-mail.
+3. No registrador (o do MyBricks é o **GoDaddy**: Meus produtos → o domínio → DNS → Nameservers → *Inserir meus próprios nameservers*), troque os servidores pelos dois da Cloudflare (`ada.ns.cloudflare.com` e `matteo.ns.cloudflare.com`, no caso do MyBricks) e confirme na Cloudflare com **I updated my nameservers**. Se o DNSSEC estiver ligado, desligue antes. Se o GoDaddy não permitir a troca para um `.com.br`, faça-a em registro.br. A ativação leva de minutos a algumas horas; a Cloudflare avisa por e-mail.
+
 4. Em **DNS → Records**, confira os registros que a Cloudflare importou do domínio:
    - Os registros `A` do `mybricks.com.br` (o site antigo) **já com a nuvem laranja** bastam para a rota do Worker funcionar: ela responde antes do servidor antigo. Deixe-os até o deploy; depois podem ser apagados.
    - Se o apex **não** tiver nenhum registro proxied, crie `AAAA` `@` → `100::` (nuvem laranja). Ele não aponta para lugar nenhum de verdade: só faz o tráfego passar pela Cloudflare.
