@@ -13,7 +13,7 @@
     "coverage": "vitest run --coverage",
     "typecheck": "tsc -b",
     "hero:images": "node scripts/build-hero-images.mjs",
-    "api:types": "npm run openapi:export -w api && npx --yes openapi-typescript@7.13.0 ../api/docs/openapi.json -o src/lib/api/schema.d.ts"
+    "api:types": "npm --prefix ../api run openapi:export && npx --yes openapi-typescript@7.13.0 ../api/docs/openapi.json -o src/lib/api/schema.d.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
