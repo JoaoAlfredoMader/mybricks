@@ -1,4 +1,4 @@
-import type { ConservationState, PropertyType } from "../../generated/prisma/enums.js";
+import type { ConservationState, PropertyType } from "../../db/enums.js";
 import { centsToNumber } from "../../shared/money.js";
 import type { ListingRecord } from "./listings.repository.js";
 

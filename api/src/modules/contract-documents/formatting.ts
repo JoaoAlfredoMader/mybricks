@@ -1,4 +1,4 @@
-import type { AdjustmentIndex } from "../../generated/prisma/enums.js";
+import type { AdjustmentIndex } from "../../db/enums.js";
 
 const MONEY = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const LONG_DATE = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });

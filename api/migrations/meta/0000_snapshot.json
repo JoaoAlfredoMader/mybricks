@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6d98e600-3a9d-43c5-b13c-7dbb46ed7d9c",
+  "id": "1ef0ddc0-8c44-45c5-9c84-6bc80665f8e3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "accounts": {
@@ -128,7 +128,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -190,7 +190,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -343,7 +343,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_audit_logs_actor": {
           "name": "fk_audit_logs_actor",
@@ -356,7 +356,7 @@
             "id"
           ],
           "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_audit_logs_impersonator": {
           "name": "fk_audit_logs_impersonator",
@@ -369,7 +369,7 @@
             "id"
           ],
           "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -408,9 +408,24 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "name_search": {
+          "name": "name_search",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         }
       },
       "indexes": {
+        "ix_cities_name_search": {
+          "name": "ix_cities_name_search",
+          "columns": [
+            "name_search"
+          ],
+          "isUnique": false
+        },
         "uq_cities_state_name": {
           "name": "uq_cities_state_name",
           "columns": [
@@ -538,7 +553,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_clients_createdBy": {
           "name": "fk_clients_createdBy",
@@ -553,7 +568,7 @@
             "user_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -628,7 +643,7 @@
             "contract_type"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -711,7 +726,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_contract_templates_updatedBy": {
           "name": "fk_contract_templates_updatedBy",
@@ -724,7 +739,7 @@
             "id"
           ],
           "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -900,7 +915,7 @@
             "organization_id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_contracts_occupant": {
           "name": "fk_contracts_occupant",
@@ -915,7 +930,7 @@
             "organization_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_contracts_pdfFile": {
           "name": "fk_contracts_pdfFile",
@@ -930,7 +945,7 @@
             "organization_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -1041,7 +1056,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_feedbacks_user": {
           "name": "fk_feedbacks_user",
@@ -1054,7 +1069,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_feedbacks_attachment": {
           "name": "fk_feedbacks_attachment",
@@ -1069,7 +1084,7 @@
             "organization_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -1172,7 +1187,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_invitations_inviter": {
           "name": "fk_invitations_inviter",
@@ -1185,7 +1200,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -1266,7 +1281,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_members_user": {
           "name": "fk_members_user",
@@ -1279,7 +1294,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -1376,7 +1391,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -1747,7 +1762,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_properties_createdBy": {
           "name": "fk_properties_createdBy",
@@ -1762,7 +1777,7 @@
             "user_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_properties_client": {
           "name": "fk_properties_client",
@@ -1777,7 +1792,7 @@
             "organization_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_properties_agency": {
           "name": "fk_properties_agency",
@@ -1792,7 +1807,7 @@
             "organization_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_properties_subtype": {
           "name": "fk_properties_subtype",
@@ -1807,7 +1822,7 @@
             "property_type"
           ],
           "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_properties_allowedUsage": {
           "name": "fk_properties_allowedUsage",
@@ -1822,7 +1837,7 @@
             "usage_type"
           ],
           "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -1924,7 +1939,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2028,7 +2043,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_property_addresses_city": {
           "name": "fk_property_addresses_city",
@@ -2041,7 +2056,7 @@
             "ibge_code"
           ],
           "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2124,7 +2139,7 @@
             "organization_id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_property_documents_file": {
           "name": "fk_property_documents_file",
@@ -2139,7 +2154,7 @@
             "organization_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2285,7 +2300,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2352,7 +2367,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2414,7 +2429,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2513,7 +2528,7 @@
             "organization_id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_property_photos_file": {
           "name": "fk_property_photos_file",
@@ -2528,7 +2543,7 @@
             "organization_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2617,7 +2632,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2865,7 +2880,7 @@
             "organization_id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_reservations_occupant": {
           "name": "fk_reservations_occupant",
@@ -2880,7 +2895,7 @@
             "organization_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_reservations_contract": {
           "name": "fk_reservations_contract",
@@ -2895,7 +2910,7 @@
             "property_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -3038,7 +3053,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_sessions_activeOrganization": {
           "name": "fk_sessions_activeOrganization",
@@ -3051,7 +3066,7 @@
             "id"
           ],
           "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_sessions_impersonator": {
           "name": "fk_sessions_impersonator",
@@ -3064,7 +3079,7 @@
             "id"
           ],
           "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -3175,7 +3190,7 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_stored_files_uploadedBy": {
           "name": "fk_stored_files_uploadedBy",
@@ -3190,7 +3205,7 @@
             "user_id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -3368,7 +3383,7 @@
             "organization_id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         },
         "fk_transactions_category": {
           "name": "fk_transactions_category",
@@ -3381,7 +3396,7 @@
             "id"
           ],
           "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "cascade"
         }
       },
       "compositePrimaryKeys": {},

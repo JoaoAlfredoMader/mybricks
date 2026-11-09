@@ -1,5 +1,5 @@
 import type { Prisma } from "../../generated/prisma/client.js";
-import type { TransactionType } from "../../generated/prisma/enums.js";
+import type { TransactionType } from "../../db/enums.js";
 import type { PrismaClient } from "../../lib/prisma.js";
 import { transactionPeriodFilter } from "./transaction-period.js";
 

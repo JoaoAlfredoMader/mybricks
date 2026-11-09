@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { StorageProvider } from "../../lib/storage/storage.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
@@ -18,8 +18,8 @@ import { createPhotosService } from "./photos.service.js";
 const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 
 /** Route layer. Mounted under `/api/properties/:propertyId/photos`. */
-export function createPhotosRoutes(prisma: PrismaClient, storage: StorageProvider, maxUploadBytes: number) {
-  const controller = createPhotosController(createPhotosService(createPhotosRepository(prisma), storage, { maxUploadBytes }));
+export function createPhotosRoutes(db: Database, storage: StorageProvider, maxUploadBytes: number) {
+  const controller = createPhotosController(createPhotosService(createPhotosRepository(db), storage, { maxUploadBytes }));
   const limit = bodyLimit({
     maxSize: maxUploadBytes + MULTIPART_OVERHEAD_BYTES,
     onError: () => {

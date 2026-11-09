@@ -1,6 +1,6 @@
 import { createApp } from "./app.js";
 import type { Env } from "./config/env.js";
-import type { PrismaClient } from "./lib/prisma.js";
+import type { Database } from "./db/database.js";
 import { createMailer } from "./lib/mail/create-mailer.js";
 import type { Mailer } from "./lib/mail/mailer.js";
 import { createStorage } from "./lib/storage/create-storage.js";
@@ -25,18 +25,18 @@ export interface ContainerOptions {
  * client instead of creating it, so each runtime brings its own: `container.ts` for Node (server,
  * scripts, tests) and `worker.ts` for Cloudflare Workers.
  */
-export function composeContainer(prisma: PrismaClient, env: Env, options: ContainerOptions = {}) {
+export function composeContainer(db: Database, env: Env, options: ContainerOptions = {}) {
   const storage = createStorage(env);
   const mailer = options.mailer ?? createMailer(env);
-  const audit = createAuditRecorder(createAuditRepository(prisma));
-  const provisioning = createProvisioningService(createProvisioningRepository(prisma), {
+  const audit = createAuditRecorder(createAuditRepository(db));
+  const provisioning = createProvisioningService(createProvisioningRepository(db), {
     demoTtlHours: env.DEMO_TTL_HOURS,
-    ...(options.withoutDemoData ? {} : { demoSeeder: createDemoSeeder(prisma) }),
+    ...(options.withoutDemoData ? {} : { demoSeeder: createDemoSeeder(db) }),
   });
-  const auth = createAuth({ prisma, env, provisioning, audit, mailer, ...(options.runInBackground ? { runInBackground: options.runInBackground } : {}) });
-  const app = createApp({ prisma, env, auth, provisioning, audit, storage });
+  const auth = createAuth({ db, env, provisioning, audit, mailer, ...(options.runInBackground ? { runInBackground: options.runInBackground } : {}) });
+  const app = createApp({ db, env, auth, provisioning, audit, storage });
 
-  return { prisma, storage, mailer, audit, provisioning, auth, app };
+  return { db, storage, mailer, audit, provisioning, auth, app };
 }
 
 export type Container = ReturnType<typeof composeContainer>;

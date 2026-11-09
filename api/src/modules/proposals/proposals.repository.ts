@@ -1,5 +1,5 @@
 import type { Prisma } from "../../generated/prisma/client.js";
-import type { ProposalType } from "../../generated/prisma/enums.js";
+import type { ProposalType } from "../../db/enums.js";
 import type { PrismaClient } from "../../lib/prisma.js";
 
 const select = {

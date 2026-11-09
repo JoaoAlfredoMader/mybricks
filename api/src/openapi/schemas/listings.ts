@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ConservationState, PropertyType } from "../../generated/prisma/enums.js";
+import { ConservationState, PropertyType } from "../../db/enums.js";
 import type { ListingDto, ListingModerationDto, ListingsDto } from "../../modules/listings/listings.dto.js";
 import { cents, nullable, output, timestamp } from "./common.js";
 

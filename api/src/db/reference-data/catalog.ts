@@ -1,4 +1,4 @@
-import type { PropertyType, TransactionType, UsageType } from "../../../src/generated/prisma/enums.js";
+import type { PropertyType, TransactionType, UsageType } from "../enums.js";
 
 /**
  * Reference data shown to the user, so display names are in pt-BR (like the IBGE city names).

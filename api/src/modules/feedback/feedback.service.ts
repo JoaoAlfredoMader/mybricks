@@ -1,4 +1,4 @@
-import type { FeedbackStatus } from "../../generated/prisma/enums.js";
+import type { FeedbackStatus } from "../../db/enums.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import type { TenantScope } from "../../shared/http/tenant.js";
 import {

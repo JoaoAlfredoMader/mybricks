@@ -1,4 +1,4 @@
-import type { PersonType } from "../../generated/prisma/enums.js";
+import type { PersonType } from "../../db/enums.js";
 import type { ClientRecord } from "./clients.repository.js";
 
 /** Shape returned by the API. Dates are ISO strings. */

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ReservationStatus } from "../../generated/prisma/enums.js";
+import { ReservationStatus } from "../../db/enums.js";
 import { optionalText } from "../../shared/validation/optional-text.js";
 import { occupantInputSchema } from "../occupants/occupant-input.js";
 

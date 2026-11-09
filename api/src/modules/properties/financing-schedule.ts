@@ -1,4 +1,4 @@
-import type { AmortizationSystem } from "../../generated/prisma/enums.js";
+import type { AmortizationSystem } from "../../db/enums.js";
 
 /**
  * Pure amortization maths for a property financing: no database, no HTTP. Amounts are integer

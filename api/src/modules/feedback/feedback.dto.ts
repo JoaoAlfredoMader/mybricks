@@ -1,4 +1,4 @@
-import type { FeedbackStatus } from "../../generated/prisma/enums.js";
+import type { FeedbackStatus } from "../../db/enums.js";
 import type { FeedbackRecord } from "./feedback.repository.js";
 
 /** What the author sees of their own feedback. */

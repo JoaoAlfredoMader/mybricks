@@ -1,41 +1,28 @@
-import { execSync } from "node:child_process";
 import { rm } from "node:fs/promises";
-import pg from "pg";
 import type { TestProject } from "vitest/node";
+import { createDatabase, migrateDatabase } from "../src/db/client.node.js";
 
 /**
- * Prepares the test database once per run: creates it when missing, applies the migrations and
- * seeds the reference data (both are idempotent).
+ * Prepares the test database once per run: a new SQLite file with every migration applied (the schema
+ * and the reference data: cities, subtypes, categories). The file lives in the temp folder and is
+ * removed when the run ends.
  */
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const databaseUrl = project.config.env.DATABASE_URL;
-  if (!databaseUrl) throw new Error("DATABASE_URL is not set for the tests");
+  if (!databaseUrl?.startsWith("file:")) throw new Error("DATABASE_URL must be a file: URL for the tests");
+  const file = databaseUrl.slice("file:".length);
 
-  const url = new URL(databaseUrl);
-  const name = url.pathname.slice(1);
-  if (!/^[a-z0-9_]+_test$/.test(name)) {
-    throw new Error(`Refusing to run the tests against "${name}": the database name must end with _test`);
-  }
-
-  const adminUrl = new URL(url);
-  adminUrl.pathname = "/postgres";
-  adminUrl.search = "";
-  const admin = new pg.Client({ connectionString: adminUrl.toString() });
-  await admin.connect();
+  const { db, close } = createDatabase(databaseUrl);
   try {
-    const exists = await admin.query("SELECT 1 FROM pg_database WHERE datname = $1", [name]);
-    if (exists.rowCount === 0) await admin.query(`CREATE DATABASE "${name}"`);
+    await migrateDatabase(db);
   } finally {
-    await admin.end();
+    close();
   }
 
-  const env = { ...process.env, DATABASE_URL: databaseUrl };
-  execSync("npx prisma migrate deploy", { env, stdio: "pipe" });
-  execSync("npx tsx prisma/seed/index.ts", { env, stdio: "pipe" });
-
-  // Teardown: the files the tests uploaded.
+  // Teardown: the database and the files the tests uploaded.
   const storageDir = project.config.env.STORAGE_DIR;
   return async () => {
+    await Promise.all([file, `${file}-journal`, `${file}-wal`, `${file}-shm`].map((path) => rm(path, { force: true })));
     if (storageDir) await rm(storageDir, { recursive: true, force: true });
   };
 }

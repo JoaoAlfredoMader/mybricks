@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AuditAction, AuditEntityType, FeedbackStatus, PropertyType, TransactionType, UsageType } from "../../generated/prisma/enums.js";
+import { AuditAction, AuditEntityType, FeedbackStatus, PropertyType, TransactionType, UsageType } from "../../db/enums.js";
 import type { AuditLogDto } from "../../modules/audit/audit.dto.js";
 import type { ContractPdfDto } from "../../modules/contract-documents/contract-documents.service.js";
 import type { TemplateDto } from "../../modules/contract-templates/contract-templates.service.js";

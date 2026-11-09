@@ -5,7 +5,7 @@ import type {
   ContractType,
   RentalMode,
   UsageType,
-} from "../../generated/prisma/enums.js";
+} from "../../db/enums.js";
 import type { PrismaClient } from "../../lib/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import type { OccupantRef } from "../occupants/occupant-input.js";

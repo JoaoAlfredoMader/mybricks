@@ -1,4 +1,4 @@
-import type { PersonType } from "../../generated/prisma/enums.js";
+import type { PersonType } from "../../db/enums.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import type { TenantScope } from "../../shared/http/tenant.js";
 import { isValidCnpj, isValidCpf } from "../../shared/validation/brazilian-document.js";

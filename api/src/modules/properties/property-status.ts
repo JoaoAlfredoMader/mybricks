@@ -1,4 +1,4 @@
-import type { RentalMode, UsageType } from "../../generated/prisma/enums.js";
+import type { RentalMode, UsageType } from "../../db/enums.js";
 
 /** Derived, never stored: it follows the property's usage and its rental data. */
 export type PropertyStatus = "own_use" | "loan_for_use" | "rented" | "vacant";

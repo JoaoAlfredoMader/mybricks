@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { requireAuth } from "../../shared/http/auth.middleware.js";
 import { audited } from "../../shared/http/audit.middleware.js";
@@ -19,8 +19,8 @@ import { createReservationsService } from "./reservations.service.js";
  * Route layer: HTTP binding (path, validation, serialization).
  * Reservations are never deleted: they are cancelled, so the history stays.
  */
-export function createReservationsRoutes(prisma: PrismaClient) {
-  const controller = createReservationsController(createReservationsService(createReservationsRepository(prisma)));
+export function createReservationsRoutes(db: Database) {
+  const controller = createReservationsController(createReservationsService(createReservationsRepository(db)));
 
   return new Hono<AppEnv>()
     .use(requireAuth)

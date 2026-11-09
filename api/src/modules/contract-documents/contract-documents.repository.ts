@@ -1,5 +1,5 @@
 import type { Prisma } from "../../generated/prisma/client.js";
-import type { AdjustmentIndex, ContractType } from "../../generated/prisma/enums.js";
+import type { AdjustmentIndex, ContractType } from "../../db/enums.js";
 import type { PrismaClient } from "../../lib/prisma.js";
 import type { AddressParts } from "./formatting.js";
 

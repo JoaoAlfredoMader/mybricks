@@ -1,25 +1,9 @@
-import type { Prisma } from "../../generated/prisma/client.js";
-import type { AuditAction, AuditEntityType } from "../../generated/prisma/enums.js";
-import type { PrismaClient } from "../../lib/prisma.js";
+import { type SQL, and, count, desc, eq, gte, lt } from "drizzle-orm";
+import type { Database } from "../../db/database.js";
+import type { AuditAction, AuditEntityType } from "../../db/enums.js";
+import { auditLogs } from "../../db/schema.js";
 
-const select = {
-  id: true,
-  organizationId: true,
-  actorUserId: true,
-  actorName: true,
-  actorEmail: true,
-  actorRole: true,
-  impersonatedById: true,
-  action: true,
-  entityType: true,
-  entityId: true,
-  details: true,
-  ipAddress: true,
-  userAgent: true,
-  createdAt: true,
-} satisfies Prisma.AuditLogSelect;
-
-export type AuditRecord = Prisma.AuditLogGetPayload<{ select: typeof select }>;
+export type AuditRecord = typeof auditLogs.$inferSelect;
 
 /** One entry of the trail. The actor is a snapshot: it stays readable after the user is gone. */
 export interface AuditEntry {
@@ -55,33 +39,33 @@ export interface AuditRepository {
   deleteOlderThan(date: Date): Promise<number>;
 }
 
-/** Repository layer: the only place that talks to Prisma. */
-export function createAuditRepository(prisma: PrismaClient): AuditRepository {
+/** Repository layer: the only place that talks to the database. */
+export function createAuditRepository(db: Database): AuditRepository {
   return {
     async create(entry) {
-      await prisma.auditLog.create({ data: entry });
+      await db.insert(auditLogs).values(entry);
     },
 
     async list(filter, { skip, take }) {
-      const where: Prisma.AuditLogWhereInput = {
-        ...(filter.organizationId ? { organizationId: filter.organizationId } : {}),
-        ...(filter.action ? { action: filter.action } : {}),
-        ...(filter.entityType ? { entityType: filter.entityType } : {}),
-        ...(filter.actorUserId ? { actorUserId: filter.actorUserId } : {}),
-        ...(filter.from || filter.to
-          ? { createdAt: { ...(filter.from ? { gte: filter.from } : {}), ...(filter.to ? { lt: filter.to } : {}) } }
-          : {}),
-      };
-      const [items, total] = await Promise.all([
-        prisma.auditLog.findMany({ where, select, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip, take }),
-        prisma.auditLog.count({ where }),
+      const conditions: SQL[] = [];
+      if (filter.organizationId) conditions.push(eq(auditLogs.organizationId, filter.organizationId));
+      if (filter.action) conditions.push(eq(auditLogs.action, filter.action));
+      if (filter.entityType) conditions.push(eq(auditLogs.entityType, filter.entityType));
+      if (filter.actorUserId) conditions.push(eq(auditLogs.actorUserId, filter.actorUserId));
+      if (filter.from) conditions.push(gte(auditLogs.createdAt, filter.from));
+      if (filter.to) conditions.push(lt(auditLogs.createdAt, filter.to));
+      const where = conditions.length ? and(...conditions) : undefined;
+
+      const [items, [totalRow]] = await Promise.all([
+        db.select().from(auditLogs).where(where).orderBy(desc(auditLogs.createdAt), desc(auditLogs.id)).limit(take).offset(skip),
+        db.select({ value: count() }).from(auditLogs).where(where),
       ]);
-      return { items, total };
+      return { items, total: totalRow?.value ?? 0 };
     },
 
     async deleteOlderThan(date) {
-      const { count } = await prisma.auditLog.deleteMany({ where: { createdAt: { lt: date } } });
-      return count;
+      const removed = await db.delete(auditLogs).where(lt(auditLogs.createdAt, date)).returning({ id: auditLogs.id });
+      return removed.length;
     },
   };
 }

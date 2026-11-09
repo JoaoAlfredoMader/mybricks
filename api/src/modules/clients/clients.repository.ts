@@ -1,5 +1,5 @@
 import { Prisma } from "../../generated/prisma/client.js";
-import type { PersonType } from "../../generated/prisma/enums.js";
+import type { PersonType } from "../../db/enums.js";
 import type { PrismaClient } from "../../lib/prisma.js";
 import { AppError } from "../../shared/errors/app-error.js";
 

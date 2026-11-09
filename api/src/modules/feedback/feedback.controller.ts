@@ -1,4 +1,4 @@
-import type { FeedbackStatus } from "../../generated/prisma/enums.js";
+import type { FeedbackStatus } from "../../db/enums.js";
 import type { TenantScope } from "../../shared/http/tenant.js";
 import type { AdminFeedbackDto, FeedbackDto, Page } from "./feedback.dto.js";
 import type { CreateFeedbackInput, ListFeedbackInput } from "./feedback.schemas.js";

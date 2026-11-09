@@ -1,4 +1,4 @@
-import type { AcquisitionType, PropertyType, RentalMode, UsageType } from "../../generated/prisma/enums.js";
+import type { AcquisitionType, PropertyType, RentalMode, UsageType } from "../../db/enums.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import type { TenantScope } from "../../shared/http/tenant.js";
 import { centsToNumber, numberToCents } from "../../shared/money.js";

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { StorageProvider } from "../../lib/storage/storage.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { recordAudit } from "../../shared/http/audit.middleware.js";
@@ -11,16 +11,16 @@ import { createListingsRepository } from "./listings.repository.js";
 import { listListingsQuerySchema, listingIdParamSchema, propertyIdParamSchema, setListingHiddenSchema } from "./listings.schemas.js";
 import { type ListingsServiceOptions, createListingsService } from "./listings.service.js";
 
-function createController(prisma: PrismaClient, storage: StorageProvider, options: ListingsServiceOptions) {
-  return createListingsController(createListingsService(createListingsRepository(prisma), storage, options));
+function createController(db: Database, storage: StorageProvider, options: ListingsServiceOptions) {
+  return createListingsController(createListingsService(createListingsRepository(db), storage, options));
 }
 
 /**
  * Route layer, PUBLIC: no session, no tenant. Mounted under `/api/listings`, before the session is
  * loaded. What leaves the organization is only what `ListingDto` whitelists.
  */
-export function createListingsRoutes(prisma: PrismaClient, storage: StorageProvider, options: ListingsServiceOptions) {
-  const controller = createController(prisma, storage, options);
+export function createListingsRoutes(db: Database, storage: StorageProvider, options: ListingsServiceOptions) {
+  const controller = createController(db, storage, options);
 
   return new Hono<AppEnv>()
     .get("/", validate("query", listListingsQuerySchema), async (c) => {
@@ -43,8 +43,8 @@ export function createListingsRoutes(prisma: PrismaClient, storage: StorageProvi
 }
 
 /** Route layer, for the platform operator (owner panel): moderate the listings. Mounted under `/api/admin/listings`. */
-export function createAdminListingsRoutes(prisma: PrismaClient, storage: StorageProvider, options: ListingsServiceOptions) {
-  const controller = createController(prisma, storage, options);
+export function createAdminListingsRoutes(db: Database, storage: StorageProvider, options: ListingsServiceOptions) {
+  const controller = createController(db, storage, options);
 
   return new Hono<AppEnv>()
     .use(requirePlatformAdmin)

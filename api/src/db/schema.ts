@@ -45,9 +45,9 @@ export const sessions = sqliteTable(
     index("ix_sessions_expires_at").on(t.expiresAt),
     index("ix_sessions_active_organization_id").on(t.activeOrganizationId),
     index("ix_sessions_impersonated_by_id").on(t.impersonatedBy),
-    foreignKey({ name: "fk_sessions_user", columns: [t.userId], foreignColumns: [users.id] }).onDelete("cascade"),
-    foreignKey({ name: "fk_sessions_activeOrganization", columns: [t.activeOrganizationId], foreignColumns: [organizations.id] }).onDelete("set null"),
-    foreignKey({ name: "fk_sessions_impersonator", columns: [t.impersonatedBy], foreignColumns: [users.id] }).onDelete("set null"),
+    foreignKey({ name: "fk_sessions_user", columns: [t.userId], foreignColumns: [users.id] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_sessions_activeOrganization", columns: [t.activeOrganizationId], foreignColumns: [organizations.id] }).onDelete("set null").onUpdate("cascade"),
+    foreignKey({ name: "fk_sessions_impersonator", columns: [t.impersonatedBy], foreignColumns: [users.id] }).onDelete("set null").onUpdate("cascade"),
   ],
 );
 
@@ -71,7 +71,7 @@ export const accounts = sqliteTable(
   (t) => [
     unique("uq_accounts_provider_id_account_id").on(t.providerId, t.accountId),
     index("ix_accounts_user_id").on(t.userId),
-    foreignKey({ name: "fk_accounts_user", columns: [t.userId], foreignColumns: [users.id] }).onDelete("cascade"),
+    foreignKey({ name: "fk_accounts_user", columns: [t.userId], foreignColumns: [users.id] }).onDelete("cascade").onUpdate("cascade"),
   ],
 );
 
@@ -119,8 +119,8 @@ export const members = sqliteTable(
   (t) => [
     unique("uq_members_organization_id_user_id").on(t.organizationId, t.userId),
     index("ix_members_user_id").on(t.userId),
-    foreignKey({ name: "fk_members_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade"),
-    foreignKey({ name: "fk_members_user", columns: [t.userId], foreignColumns: [users.id] }).onDelete("cascade"),
+    foreignKey({ name: "fk_members_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_members_user", columns: [t.userId], foreignColumns: [users.id] }).onDelete("cascade").onUpdate("cascade"),
   ],
 );
 
@@ -139,8 +139,8 @@ export const invitations = sqliteTable(
   (t) => [
     index("ix_invitations_organization_id_email").on(t.organizationId, t.email),
     index("ix_invitations_inviter_id").on(t.inviterId),
-    foreignKey({ name: "fk_invitations_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade"),
-    foreignKey({ name: "fk_invitations_inviter", columns: [t.inviterId], foreignColumns: [users.id] }).onDelete("cascade"),
+    foreignKey({ name: "fk_invitations_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_invitations_inviter", columns: [t.inviterId], foreignColumns: [users.id] }).onDelete("cascade").onUpdate("cascade"),
     check("ck_invitations_status", sql`${t.status} in ('pending', 'accepted', 'rejected', 'canceled')`),
   ],
 );
@@ -163,8 +163,8 @@ export const clients = sqliteTable(
     unique("uq_clients_id_organization_id").on(t.id, t.organizationId),
     unique("uq_clients_organization_id_document").on(t.organizationId, t.document),
     index("ix_clients_organization_id_created_by_id").on(t.organizationId, t.createdById),
-    foreignKey({ name: "fk_clients_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade"),
-    foreignKey({ name: "fk_clients_createdBy", columns: [t.organizationId, t.createdById], foreignColumns: [members.organizationId, members.userId] }).onDelete("no action"),
+    foreignKey({ name: "fk_clients_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_clients_createdBy", columns: [t.organizationId, t.createdById], foreignColumns: [members.organizationId, members.userId] }).onDelete("no action").onUpdate("cascade"),
     check("ck_clients_person_type", sql`${t.personType} in ('individual', 'company')`),
   ],
 );
@@ -184,7 +184,7 @@ export const occupants = sqliteTable(
   (t) => [
     unique("uq_occupants_id_organization_id").on(t.id, t.organizationId),
     unique("uq_occupants_organization_id_document").on(t.organizationId, t.document),
-    foreignKey({ name: "fk_occupants_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade"),
+    foreignKey({ name: "fk_occupants_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade").onUpdate("cascade"),
   ],
 );
 
@@ -198,7 +198,7 @@ export const agencies = sqliteTable(
   (t) => [
     unique("uq_agencies_id_organization_id").on(t.id, t.organizationId),
     unique("uq_agencies_organization_id_name").on(t.organizationId, t.name),
-    foreignKey({ name: "fk_agencies_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade"),
+    foreignKey({ name: "fk_agencies_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade").onUpdate("cascade"),
   ],
 );
 
@@ -208,9 +208,12 @@ export const cities = sqliteTable(
     ibgeCode: integer("ibge_code").primaryKey(),
     name: text("name").notNull(),
     state: text("state").notNull(),
+    /** Lower case, no accents: what the city search compares against (SQLite has no unaccent()). */
+    nameSearch: text("name_search").notNull().default(""),
   },
   (t) => [
     unique("uq_cities_state_name").on(t.state, t.name),
+    index("ix_cities_name_search").on(t.nameSearch),
   ],
 );
 
@@ -294,12 +297,12 @@ export const properties = sqliteTable(
     index("ix_properties_organization_id_agency_id").on(t.organizationId, t.agencyId),
     index("ix_properties_organization_id_property_type").on(t.organizationId, t.propertyType),
     index("ix_properties_subtype_id").on(t.subtypeId),
-    foreignKey({ name: "fk_properties_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade"),
-    foreignKey({ name: "fk_properties_createdBy", columns: [t.organizationId, t.createdById], foreignColumns: [members.organizationId, members.userId] }).onDelete("no action"),
-    foreignKey({ name: "fk_properties_client", columns: [t.clientId, t.organizationId], foreignColumns: [clients.id, clients.organizationId] }).onDelete("no action"),
-    foreignKey({ name: "fk_properties_agency", columns: [t.agencyId, t.organizationId], foreignColumns: [agencies.id, agencies.organizationId] }).onDelete("no action"),
-    foreignKey({ name: "fk_properties_subtype", columns: [t.subtypeId, t.propertyType], foreignColumns: [propertySubtypes.id, propertySubtypes.propertyType] }).onDelete("restrict"),
-    foreignKey({ name: "fk_properties_allowedUsage", columns: [t.propertyType, t.usageType], foreignColumns: [propertyTypeUsages.propertyType, propertyTypeUsages.usageType] }).onDelete("restrict"),
+    foreignKey({ name: "fk_properties_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_properties_createdBy", columns: [t.organizationId, t.createdById], foreignColumns: [members.organizationId, members.userId] }).onDelete("no action").onUpdate("cascade"),
+    foreignKey({ name: "fk_properties_client", columns: [t.clientId, t.organizationId], foreignColumns: [clients.id, clients.organizationId] }).onDelete("no action").onUpdate("cascade"),
+    foreignKey({ name: "fk_properties_agency", columns: [t.agencyId, t.organizationId], foreignColumns: [agencies.id, agencies.organizationId] }).onDelete("no action").onUpdate("cascade"),
+    foreignKey({ name: "fk_properties_subtype", columns: [t.subtypeId, t.propertyType], foreignColumns: [propertySubtypes.id, propertySubtypes.propertyType] }).onDelete("restrict").onUpdate("cascade"),
+    foreignKey({ name: "fk_properties_allowedUsage", columns: [t.propertyType, t.usageType], foreignColumns: [propertyTypeUsages.propertyType, propertyTypeUsages.usageType] }).onDelete("restrict").onUpdate("cascade"),
     check("ck_properties_property_type", sql`${t.propertyType} in ('residential', 'commercial', 'land', 'logistics', 'rural', 'parking')`),
     check("ck_properties_usage_type", sql`${t.usageType} in ('rental', 'short_stay', 'agricultural_lease', 'concession', 'own_use', 'loan_for_use')`),
     check("ck_properties_conservation_state", sql`${t.conservationState} in ('degraded', 'poor', 'regular', 'good', 'excellent')`),
@@ -323,7 +326,7 @@ export const propertyManualRentals = sqliteTable(
     dueDay: integer("due_day"),
   },
   (t) => [
-    foreignKey({ name: "fk_property_manual_rentals_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade"),
+    foreignKey({ name: "fk_property_manual_rentals_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade").onUpdate("cascade"),
     check("ck_manual_rentals_values", sql`${t.monthlyRentCents} >= 0 AND (${t.dueDay} IS NULL OR ${t.dueDay} BETWEEN 1 AND 31)`),
   ],
 );
@@ -343,8 +346,8 @@ export const propertyAddresses = sqliteTable(
   },
   (t) => [
     index("ix_property_addresses_city_id").on(t.cityId),
-    foreignKey({ name: "fk_property_addresses_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade"),
-    foreignKey({ name: "fk_property_addresses_city", columns: [t.cityId], foreignColumns: [cities.ibgeCode] }).onDelete("restrict"),
+    foreignKey({ name: "fk_property_addresses_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_property_addresses_city", columns: [t.cityId], foreignColumns: [cities.ibgeCode] }).onDelete("restrict").onUpdate("cascade"),
   ],
 );
 
@@ -358,7 +361,7 @@ export const propertyAcquisitions = sqliteTable(
   },
   (t) => [
     unique("uq_property_acquisitions_property_id_acquisition_type").on(t.propertyId, t.acquisitionType),
-    foreignKey({ name: "fk_property_acquisitions_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade"),
+    foreignKey({ name: "fk_property_acquisitions_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade").onUpdate("cascade"),
     check("ck_property_acquisitions_acquisition_type", sql`${t.acquisitionType} in ('purchase', 'construction', 'inheritance', 'other')`),
     check("ck_acquisitions_cost", sql`${t.costCents} IS NULL OR ${t.costCents} >= 0`),
   ],
@@ -397,7 +400,7 @@ export const propertyLegalRecords = sqliteTable(
     notes: text("notes"),
   },
   (t) => [
-    foreignKey({ name: "fk_property_legal_records_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade"),
+    foreignKey({ name: "fk_property_legal_records_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade").onUpdate("cascade"),
     check("ck_property_legal_records_registration_status", sql`${t.registrationStatus} in ('regular', 'irregular')`),
     check("ck_legal_irregularity", sql`${t.irregularityDescription} IS NULL OR ${t.registrationStatus} = 'irregular'`),
   ],
@@ -410,7 +413,7 @@ export const propertyInsurances = sqliteTable(
     description: text("description"),
   },
   (t) => [
-    foreignKey({ name: "fk_property_insurances_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade"),
+    foreignKey({ name: "fk_property_insurances_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade").onUpdate("cascade"),
   ],
 );
 
@@ -428,7 +431,7 @@ export const propertyProposals = sqliteTable(
   },
   (t) => [
     index("ix_property_proposals_property_id_proposal_date").on(t.propertyId, t.proposalDate),
-    foreignKey({ name: "fk_property_proposals_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade"),
+    foreignKey({ name: "fk_property_proposals_property", columns: [t.propertyId], foreignColumns: [properties.id] }).onDelete("cascade").onUpdate("cascade"),
     check("ck_property_proposals_proposal_type", sql`${t.proposalType} in ('purchase', 'sale', 'rental', 'linked', 'informal')`),
     check("ck_proposals_amount", sql`${t.amountCents} > 0`),
   ],
@@ -450,8 +453,8 @@ export const storedFiles = sqliteTable(
     unique("uq_stored_files_id_organization_id").on(t.id, t.organizationId),
     index("ix_stored_files_organization_id_uploaded_by_id").on(t.organizationId, t.uploadedById),
     index("ix_stored_files_created_at").on(t.createdAt),
-    foreignKey({ name: "fk_stored_files_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade"),
-    foreignKey({ name: "fk_stored_files_uploadedBy", columns: [t.organizationId, t.uploadedById], foreignColumns: [members.organizationId, members.userId] }).onDelete("no action"),
+    foreignKey({ name: "fk_stored_files_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_stored_files_uploadedBy", columns: [t.organizationId, t.uploadedById], foreignColumns: [members.organizationId, members.userId] }).onDelete("no action").onUpdate("cascade"),
     check("ck_stored_files_size", sql`${t.sizeBytes} >= 0`),
   ],
 );
@@ -470,8 +473,8 @@ export const propertyPhotos = sqliteTable(
     unique("uq_property_photos_property_id_file_id").on(t.propertyId, t.fileId),
     index("ix_property_photos_property_id_position").on(t.propertyId, t.position),
     index("ix_property_photos_file_id_organization_id").on(t.fileId, t.organizationId),
-    foreignKey({ name: "fk_property_photos_property", columns: [t.propertyId, t.organizationId], foreignColumns: [properties.id, properties.organizationId] }).onDelete("cascade"),
-    foreignKey({ name: "fk_property_photos_file", columns: [t.fileId, t.organizationId], foreignColumns: [storedFiles.id, storedFiles.organizationId] }).onDelete("no action"),
+    foreignKey({ name: "fk_property_photos_property", columns: [t.propertyId, t.organizationId], foreignColumns: [properties.id, properties.organizationId] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_property_photos_file", columns: [t.fileId, t.organizationId], foreignColumns: [storedFiles.id, storedFiles.organizationId] }).onDelete("no action").onUpdate("cascade"),
   ],
 );
 
@@ -487,8 +490,8 @@ export const propertyDocuments = sqliteTable(
   },
   (t) => [
     index("ix_property_documents_property_id").on(t.propertyId),
-    foreignKey({ name: "fk_property_documents_property", columns: [t.propertyId, t.organizationId], foreignColumns: [properties.id, properties.organizationId] }).onDelete("cascade"),
-    foreignKey({ name: "fk_property_documents_file", columns: [t.fileId, t.organizationId], foreignColumns: [storedFiles.id, storedFiles.organizationId] }).onDelete("no action"),
+    foreignKey({ name: "fk_property_documents_property", columns: [t.propertyId, t.organizationId], foreignColumns: [properties.id, properties.organizationId] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_property_documents_file", columns: [t.fileId, t.organizationId], foreignColumns: [storedFiles.id, storedFiles.organizationId] }).onDelete("no action").onUpdate("cascade"),
   ],
 );
 
@@ -516,9 +519,9 @@ export const contracts = sqliteTable(
     index("ix_contracts_organization_id_status").on(t.organizationId, t.status),
     index("ix_contracts_occupant_id_organization_id").on(t.occupantId, t.organizationId),
     index("ix_contracts_pdf_file_id_organization_id").on(t.pdfFileId, t.organizationId),
-    foreignKey({ name: "fk_contracts_property", columns: [t.propertyId, t.organizationId], foreignColumns: [properties.id, properties.organizationId] }).onDelete("cascade"),
-    foreignKey({ name: "fk_contracts_occupant", columns: [t.occupantId, t.organizationId], foreignColumns: [occupants.id, occupants.organizationId] }).onDelete("no action"),
-    foreignKey({ name: "fk_contracts_pdfFile", columns: [t.pdfFileId, t.organizationId], foreignColumns: [storedFiles.id, storedFiles.organizationId] }).onDelete("no action"),
+    foreignKey({ name: "fk_contracts_property", columns: [t.propertyId, t.organizationId], foreignColumns: [properties.id, properties.organizationId] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_contracts_occupant", columns: [t.occupantId, t.organizationId], foreignColumns: [occupants.id, occupants.organizationId] }).onDelete("no action").onUpdate("cascade"),
+    foreignKey({ name: "fk_contracts_pdfFile", columns: [t.pdfFileId, t.organizationId], foreignColumns: [storedFiles.id, storedFiles.organizationId] }).onDelete("no action").onUpdate("cascade"),
     check("ck_contracts_contract_type", sql`${t.contractType} in ('conventional', 'short_stay')`),
     check("ck_contracts_status", sql`${t.status} in ('active', 'ended', 'cancelled')`),
     check("ck_contracts_dates", sql`${t.endDate} IS NULL OR ${t.endDate} > ${t.startDate}`),
@@ -537,7 +540,7 @@ export const contractRentTerms = sqliteTable(
   },
   (t) => [
     unique("uq_contract_rent_terms_contract_id_contract_type").on(t.contractId, t.contractType),
-    foreignKey({ name: "fk_contract_rent_terms_contract", columns: [t.contractId, t.contractType], foreignColumns: [contracts.id, contracts.contractType] }).onDelete("cascade"),
+    foreignKey({ name: "fk_contract_rent_terms_contract", columns: [t.contractId, t.contractType], foreignColumns: [contracts.id, contracts.contractType] }).onDelete("cascade").onUpdate("cascade"),
     check("ck_contract_rent_terms_contract_type", sql`${t.contractType} in ('conventional', 'short_stay')`),
     check("ck_contract_rent_terms_adjustment_index", sql`${t.adjustmentIndex} in ('igpm', 'ipca', 'inpc', 'igpdi', 'other')`),
     check("ck_rent_terms_type", sql`${t.contractType} = 'conventional'`),
@@ -566,9 +569,9 @@ export const reservations = sqliteTable(
     index("ix_reservations_organization_id_check_in").on(t.organizationId, t.checkIn),
     index("ix_reservations_contract_id_property_id").on(t.contractId, t.propertyId),
     index("ix_reservations_occupant_id_organization_id").on(t.occupantId, t.organizationId),
-    foreignKey({ name: "fk_reservations_property", columns: [t.propertyId, t.organizationId], foreignColumns: [properties.id, properties.organizationId] }).onDelete("cascade"),
-    foreignKey({ name: "fk_reservations_occupant", columns: [t.occupantId, t.organizationId], foreignColumns: [occupants.id, occupants.organizationId] }).onDelete("no action"),
-    foreignKey({ name: "fk_reservations_contract", columns: [t.contractId, t.propertyId], foreignColumns: [contracts.id, contracts.propertyId] }).onDelete("no action"),
+    foreignKey({ name: "fk_reservations_property", columns: [t.propertyId, t.organizationId], foreignColumns: [properties.id, properties.organizationId] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_reservations_occupant", columns: [t.occupantId, t.organizationId], foreignColumns: [occupants.id, occupants.organizationId] }).onDelete("no action").onUpdate("cascade"),
+    foreignKey({ name: "fk_reservations_contract", columns: [t.contractId, t.propertyId], foreignColumns: [contracts.id, contracts.propertyId] }).onDelete("no action").onUpdate("cascade"),
     check("ck_reservations_status", sql`${t.status} in ('confirmed', 'cancelled')`),
     check("ck_reservations_dates", sql`${t.checkOut} > ${t.checkIn}`),
     check("ck_reservations_total", sql`${t.totalAmountCents} >= 0`),
@@ -594,8 +597,8 @@ export const transactions = sqliteTable(
     index("ix_transactions_property_id_occurred_on").on(t.propertyId, t.occurredOn),
     index("ix_transactions_organization_id_occurred_on").on(t.organizationId, t.occurredOn),
     index("ix_transactions_category_id").on(t.categoryId),
-    foreignKey({ name: "fk_transactions_property", columns: [t.propertyId, t.organizationId], foreignColumns: [properties.id, properties.organizationId] }).onDelete("cascade"),
-    foreignKey({ name: "fk_transactions_category", columns: [t.categoryId], foreignColumns: [transactionCategories.id] }).onDelete("restrict"),
+    foreignKey({ name: "fk_transactions_property", columns: [t.propertyId, t.organizationId], foreignColumns: [properties.id, properties.organizationId] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_transactions_category", columns: [t.categoryId], foreignColumns: [transactionCategories.id] }).onDelete("restrict").onUpdate("cascade"),
     check("ck_transactions_amount", sql`${t.amountCents} > 0`),
     check("ck_transactions_recurrence", sql`${t.recurrenceEndsOn} IS NULL OR (${t.isRecurring} AND ${t.recurrenceEndsOn} >= ${t.occurredOn})`),
   ],
@@ -612,8 +615,8 @@ export const contractTemplates = sqliteTable(
     updatedAt: instant("updated_at").notNull().$defaultFn(() => new Date()).$onUpdate(() => new Date()),
   },
   (t) => [
-    foreignKey({ name: "fk_contract_templates_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade"),
-    foreignKey({ name: "fk_contract_templates_updatedBy", columns: [t.updatedById], foreignColumns: [users.id] }).onDelete("set null"),
+    foreignKey({ name: "fk_contract_templates_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_contract_templates_updatedBy", columns: [t.updatedById], foreignColumns: [users.id] }).onDelete("set null").onUpdate("cascade"),
   ],
 );
 
@@ -632,9 +635,9 @@ export const feedbacks = sqliteTable(
     index("ix_feedbacks_status_created_at").on(t.status, t.createdAt),
     index("ix_feedbacks_user_id").on(t.userId),
     index("ix_feedbacks_attachment_file_id_organization_id").on(t.attachmentFileId, t.organizationId),
-    foreignKey({ name: "fk_feedbacks_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade"),
-    foreignKey({ name: "fk_feedbacks_user", columns: [t.userId], foreignColumns: [users.id] }).onDelete("cascade"),
-    foreignKey({ name: "fk_feedbacks_attachment", columns: [t.attachmentFileId, t.organizationId], foreignColumns: [storedFiles.id, storedFiles.organizationId] }).onDelete("no action"),
+    foreignKey({ name: "fk_feedbacks_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_feedbacks_user", columns: [t.userId], foreignColumns: [users.id] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_feedbacks_attachment", columns: [t.attachmentFileId, t.organizationId], foreignColumns: [storedFiles.id, storedFiles.organizationId] }).onDelete("no action").onUpdate("cascade"),
     check("ck_feedbacks_status", sql`${t.status} in ('open', 'resolved')`),
   ],
 );
@@ -662,9 +665,9 @@ export const auditLogs = sqliteTable(
     index("ix_audit_logs_actor_user_id_created_at").on(t.actorUserId, t.createdAt),
     index("ix_audit_logs_action").on(t.action),
     index("ix_audit_logs_impersonated_by_id").on(t.impersonatedById),
-    foreignKey({ name: "fk_audit_logs_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade"),
-    foreignKey({ name: "fk_audit_logs_actor", columns: [t.actorUserId], foreignColumns: [users.id] }).onDelete("set null"),
-    foreignKey({ name: "fk_audit_logs_impersonator", columns: [t.impersonatedById], foreignColumns: [users.id] }).onDelete("set null"),
+    foreignKey({ name: "fk_audit_logs_organization", columns: [t.organizationId], foreignColumns: [organizations.id] }).onDelete("cascade").onUpdate("cascade"),
+    foreignKey({ name: "fk_audit_logs_actor", columns: [t.actorUserId], foreignColumns: [users.id] }).onDelete("set null").onUpdate("cascade"),
+    foreignKey({ name: "fk_audit_logs_impersonator", columns: [t.impersonatedById], foreignColumns: [users.id] }).onDelete("set null").onUpdate("cascade"),
     check("ck_audit_logs_action", sql`${t.action} in ('login', 'logout', 'create', 'update', 'delete', 'view', 'upload', 'end_contract', 'cancel', 'generate_pdf', 'generate_report', 'invite_member', 'remove_member', 'impersonate_start', 'impersonate_end', 'unauthorized_access')`),
     check("ck_audit_logs_entity_type", sql`${t.entityType} in ('property', 'client', 'transaction', 'document', 'photo', 'contract', 'reservation', 'occupant', 'member', 'organization', 'report', 'feedback')`),
   ],

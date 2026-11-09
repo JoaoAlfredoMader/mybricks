@@ -7,7 +7,7 @@ import {
   RegistrationStatus,
   RentalMode,
   UsageType,
-} from "../../generated/prisma/enums.js";
+} from "../../db/enums.js";
 import { optionalText } from "../../shared/validation/optional-text.js";
 
 const cents = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);

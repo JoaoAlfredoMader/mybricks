@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { FeedbackStatus } from "../../generated/prisma/enums.js";
+import { FeedbackStatus } from "../../db/enums.js";
 
 export const createFeedbackSchema = z.object({ message: z.string().trim().min(3).max(5000) });
 

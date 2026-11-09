@@ -7,7 +7,7 @@ import type {
   RegistrationStatus,
   RentalMode,
   UsageType,
-} from "../../generated/prisma/enums.js";
+} from "../../db/enums.js";
 import type { PrismaClient } from "../../lib/prisma.js";
 
 const select = {

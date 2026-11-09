@@ -1,5 +1,5 @@
 import { Prisma } from "../../generated/prisma/client.js";
-import type { PropertyType, TransactionType, UsageType } from "../../generated/prisma/enums.js";
+import type { PropertyType, TransactionType, UsageType } from "../../db/enums.js";
 import type { PrismaClient } from "../../lib/prisma.js";
 
 export interface CityRecord {

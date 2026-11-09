@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { requireAuth } from "../../shared/http/auth.middleware.js";
 import { tenantScope } from "../../shared/http/tenant.js";
@@ -19,8 +19,8 @@ export const listOccupantsQuerySchema = z.object({
  * Route layer. Occupants are created together with a contract (see the contracts module);
  * this endpoint only lists them so a new contract can reuse one.
  */
-export function createOccupantsRoutes(prisma: PrismaClient) {
-  const controller = createOccupantsController(createOccupantsService(createOccupantsRepository(prisma)));
+export function createOccupantsRoutes(db: Database) {
+  const controller = createOccupantsController(createOccupantsService(createOccupantsRepository(db)));
 
   return new Hono<AppEnv>()
     .use(requireAuth)

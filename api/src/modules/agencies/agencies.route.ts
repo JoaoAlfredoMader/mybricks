@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { requireAuth } from "../../shared/http/auth.middleware.js";
 import { tenantScope } from "../../shared/http/tenant.js";
@@ -18,8 +18,8 @@ export const listAgenciesQuerySchema = z.object({
 export const agencyIdParamSchema = z.object({ id: z.uuid() });
 
 /** Route layer: HTTP binding (path, validation, serialization). */
-export function createAgenciesRoutes(prisma: PrismaClient) {
-  const controller = createAgenciesController(createAgenciesService(createAgenciesRepository(prisma)));
+export function createAgenciesRoutes(db: Database) {
+  const controller = createAgenciesController(createAgenciesService(createAgenciesRepository(db)));
 
   return new Hono<AppEnv>()
     .use(requireAuth)

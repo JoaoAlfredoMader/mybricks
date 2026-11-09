@@ -6,7 +6,7 @@ import type {
   RegistrationStatus,
   RentalMode,
   UsageType,
-} from "../../generated/prisma/enums.js";
+} from "../../db/enums.js";
 import { centsToNumber } from "../../shared/money.js";
 import type { FinancingSummary, Installment } from "./financing-schedule.js";
 import type { PropertyRecord } from "./properties.repository.js";

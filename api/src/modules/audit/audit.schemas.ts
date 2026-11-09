@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AuditAction, AuditEntityType } from "../../generated/prisma/enums.js";
+import { AuditAction, AuditEntityType } from "../../db/enums.js";
 
 const filters = {
   page: z.coerce.number().int().min(1).default(1),

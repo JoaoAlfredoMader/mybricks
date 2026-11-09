@@ -1,4 +1,4 @@
-import type { AuditAction, AuditEntityType } from "../../generated/prisma/enums.js";
+import type { AuditAction, AuditEntityType } from "../../db/enums.js";
 import type { AuditRecord } from "./audit.repository.js";
 
 /** Shape returned by the API. The numeric id travels as a string (JSON has no 64-bit integers). */

@@ -12,7 +12,7 @@ CREATE TABLE `accounts` (
 	`password` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE cascade ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `ix_accounts_user_id` ON `accounts` (`user_id`);--> statement-breakpoint
@@ -21,7 +21,7 @@ CREATE TABLE `agencies` (
 	`id` text PRIMARY KEY NOT NULL,
 	`organization_id` text NOT NULL,
 	`name` text NOT NULL,
-	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE cascade ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uq_agencies_id_organization_id` ON `agencies` (`id`,`organization_id`);--> statement-breakpoint
@@ -41,9 +41,9 @@ CREATE TABLE `audit_logs` (
 	`ip_address` text,
 	`user_agent` text,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`actor_user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null,
-	FOREIGN KEY (`impersonated_by_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`actor_user_id`) REFERENCES `users`(`id`) ON UPDATE cascade ON DELETE set null,
+	FOREIGN KEY (`impersonated_by_id`) REFERENCES `users`(`id`) ON UPDATE cascade ON DELETE set null,
 	CONSTRAINT "ck_audit_logs_action" CHECK("audit_logs"."action" in ('login', 'logout', 'create', 'update', 'delete', 'view', 'upload', 'end_contract', 'cancel', 'generate_pdf', 'generate_report', 'invite_member', 'remove_member', 'impersonate_start', 'impersonate_end', 'unauthorized_access')),
 	CONSTRAINT "ck_audit_logs_entity_type" CHECK("audit_logs"."entity_type" in ('property', 'client', 'transaction', 'document', 'photo', 'contract', 'reservation', 'occupant', 'member', 'organization', 'report', 'feedback'))
 );
@@ -55,9 +55,11 @@ CREATE INDEX `ix_audit_logs_impersonated_by_id` ON `audit_logs` (`impersonated_b
 CREATE TABLE `cities` (
 	`ibge_code` integer PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`state` text NOT NULL
+	`state` text NOT NULL,
+	`name_search` text DEFAULT '' NOT NULL
 );
 --> statement-breakpoint
+CREATE INDEX `ix_cities_name_search` ON `cities` (`name_search`);--> statement-breakpoint
 CREATE UNIQUE INDEX `uq_cities_state_name` ON `cities` (`state`,`name`);--> statement-breakpoint
 CREATE TABLE `clients` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -70,8 +72,8 @@ CREATE TABLE `clients` (
 	`whatsapp` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`organization_id`,`created_by_id`) REFERENCES `members`(`organization_id`,`user_id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`organization_id`,`created_by_id`) REFERENCES `members`(`organization_id`,`user_id`) ON UPDATE cascade ON DELETE no action,
 	CONSTRAINT "ck_clients_person_type" CHECK("clients"."person_type" in ('individual', 'company'))
 );
 --> statement-breakpoint
@@ -84,7 +86,7 @@ CREATE TABLE `contract_rent_terms` (
 	`monthly_rent_cents` integer NOT NULL,
 	`due_day` integer NOT NULL,
 	`adjustment_index` text,
-	FOREIGN KEY (`contract_id`,`contract_type`) REFERENCES `contracts`(`id`,`contract_type`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`contract_id`,`contract_type`) REFERENCES `contracts`(`id`,`contract_type`) ON UPDATE cascade ON DELETE cascade,
 	CONSTRAINT "ck_contract_rent_terms_contract_type" CHECK("contract_rent_terms"."contract_type" in ('conventional', 'short_stay')),
 	CONSTRAINT "ck_contract_rent_terms_adjustment_index" CHECK("contract_rent_terms"."adjustment_index" in ('igpm', 'ipca', 'inpc', 'igpdi', 'other')),
 	CONSTRAINT "ck_rent_terms_type" CHECK("contract_rent_terms"."contract_type" = 'conventional'),
@@ -99,8 +101,8 @@ CREATE TABLE `contract_templates` (
 	`footer` text NOT NULL,
 	`updated_by_id` text,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`updated_by_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
+	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`updated_by_id`) REFERENCES `users`(`id`) ON UPDATE cascade ON DELETE set null
 );
 --> statement-breakpoint
 CREATE TABLE `contracts` (
@@ -116,9 +118,9 @@ CREATE TABLE `contracts` (
 	`pdf_file_id` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`property_id`,`organization_id`) REFERENCES `properties`(`id`,`organization_id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`occupant_id`,`organization_id`) REFERENCES `occupants`(`id`,`organization_id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`pdf_file_id`,`organization_id`) REFERENCES `stored_files`(`id`,`organization_id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`property_id`,`organization_id`) REFERENCES `properties`(`id`,`organization_id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`occupant_id`,`organization_id`) REFERENCES `occupants`(`id`,`organization_id`) ON UPDATE cascade ON DELETE no action,
+	FOREIGN KEY (`pdf_file_id`,`organization_id`) REFERENCES `stored_files`(`id`,`organization_id`) ON UPDATE cascade ON DELETE no action,
 	CONSTRAINT "ck_contracts_contract_type" CHECK("contracts"."contract_type" in ('conventional', 'short_stay')),
 	CONSTRAINT "ck_contracts_status" CHECK("contracts"."status" in ('active', 'ended', 'cancelled')),
 	CONSTRAINT "ck_contracts_dates" CHECK("contracts"."end_date" IS NULL OR "contracts"."end_date" > "contracts"."start_date")
@@ -140,9 +142,9 @@ CREATE TABLE `feedbacks` (
 	`attachment_file_id` text,
 	`status` text DEFAULT 'open' NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`attachment_file_id`,`organization_id`) REFERENCES `stored_files`(`id`,`organization_id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`attachment_file_id`,`organization_id`) REFERENCES `stored_files`(`id`,`organization_id`) ON UPDATE cascade ON DELETE no action,
 	CONSTRAINT "ck_feedbacks_status" CHECK("feedbacks"."status" in ('open', 'resolved'))
 );
 --> statement-breakpoint
@@ -158,8 +160,8 @@ CREATE TABLE `invitations` (
 	`expires_at` integer NOT NULL,
 	`inviter_id` text NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`inviter_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`inviter_id`) REFERENCES `users`(`id`) ON UPDATE cascade ON DELETE cascade,
 	CONSTRAINT "ck_invitations_status" CHECK("invitations"."status" in ('pending', 'accepted', 'rejected', 'canceled'))
 );
 --> statement-breakpoint
@@ -171,8 +173,8 @@ CREATE TABLE `members` (
 	`user_id` text NOT NULL,
 	`role` text DEFAULT 'member' NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE cascade ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE INDEX `ix_members_user_id` ON `members` (`user_id`);--> statement-breakpoint
@@ -186,7 +188,7 @@ CREATE TABLE `occupants` (
 	`phone` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE cascade ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `uq_occupants_id_organization_id` ON `occupants` (`id`,`organization_id`);--> statement-breakpoint
@@ -234,12 +236,12 @@ CREATE TABLE `properties` (
 	`listing_hidden_at` integer,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`organization_id`,`created_by_id`) REFERENCES `members`(`organization_id`,`user_id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`client_id`,`organization_id`) REFERENCES `clients`(`id`,`organization_id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`agency_id`,`organization_id`) REFERENCES `agencies`(`id`,`organization_id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`subtype_id`,`property_type`) REFERENCES `property_subtypes`(`id`,`property_type`) ON UPDATE no action ON DELETE restrict,
-	FOREIGN KEY (`property_type`,`usage_type`) REFERENCES `property_type_usages`(`property_type`,`usage_type`) ON UPDATE no action ON DELETE restrict,
+	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`organization_id`,`created_by_id`) REFERENCES `members`(`organization_id`,`user_id`) ON UPDATE cascade ON DELETE no action,
+	FOREIGN KEY (`client_id`,`organization_id`) REFERENCES `clients`(`id`,`organization_id`) ON UPDATE cascade ON DELETE no action,
+	FOREIGN KEY (`agency_id`,`organization_id`) REFERENCES `agencies`(`id`,`organization_id`) ON UPDATE cascade ON DELETE no action,
+	FOREIGN KEY (`subtype_id`,`property_type`) REFERENCES `property_subtypes`(`id`,`property_type`) ON UPDATE cascade ON DELETE restrict,
+	FOREIGN KEY (`property_type`,`usage_type`) REFERENCES `property_type_usages`(`property_type`,`usage_type`) ON UPDATE cascade ON DELETE restrict,
 	CONSTRAINT "ck_properties_property_type" CHECK("properties"."property_type" in ('residential', 'commercial', 'land', 'logistics', 'rural', 'parking')),
 	CONSTRAINT "ck_properties_usage_type" CHECK("properties"."usage_type" in ('rental', 'short_stay', 'agricultural_lease', 'concession', 'own_use', 'loan_for_use')),
 	CONSTRAINT "ck_properties_conservation_state" CHECK("properties"."conservation_state" in ('degraded', 'poor', 'regular', 'good', 'excellent')),
@@ -264,7 +266,7 @@ CREATE TABLE `property_acquisitions` (
 	`acquisition_type` text NOT NULL,
 	`acquired_on` text,
 	`cost_cents` integer,
-	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE cascade ON DELETE cascade,
 	CONSTRAINT "ck_property_acquisitions_acquisition_type" CHECK("property_acquisitions"."acquisition_type" in ('purchase', 'construction', 'inheritance', 'other')),
 	CONSTRAINT "ck_acquisitions_cost" CHECK("property_acquisitions"."cost_cents" IS NULL OR "property_acquisitions"."cost_cents" >= 0)
 );
@@ -280,8 +282,8 @@ CREATE TABLE `property_addresses` (
 	`neighborhood` text,
 	`latitude` real,
 	`longitude` real,
-	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`city_id`) REFERENCES `cities`(`ibge_code`) ON UPDATE no action ON DELETE restrict
+	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`city_id`) REFERENCES `cities`(`ibge_code`) ON UPDATE cascade ON DELETE restrict
 );
 --> statement-breakpoint
 CREATE INDEX `ix_property_addresses_city_id` ON `property_addresses` (`city_id`);--> statement-breakpoint
@@ -292,8 +294,8 @@ CREATE TABLE `property_documents` (
 	`file_id` text NOT NULL,
 	`category` text,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`property_id`,`organization_id`) REFERENCES `properties`(`id`,`organization_id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`file_id`,`organization_id`) REFERENCES `stored_files`(`id`,`organization_id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`property_id`,`organization_id`) REFERENCES `properties`(`id`,`organization_id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`file_id`,`organization_id`) REFERENCES `stored_files`(`id`,`organization_id`) ON UPDATE cascade ON DELETE no action
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `property_documents_file_id_unique` ON `property_documents` (`file_id`);--> statement-breakpoint
@@ -318,7 +320,7 @@ CREATE UNIQUE INDEX `uq_property_financings_property_id_acquisition_type` ON `pr
 CREATE TABLE `property_insurances` (
 	`property_id` text PRIMARY KEY NOT NULL,
 	`description` text,
-	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE no action ON DELETE cascade
+	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE cascade ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE TABLE `property_legal_records` (
@@ -328,7 +330,7 @@ CREATE TABLE `property_legal_records` (
 	`registry_number` text,
 	`registry_office` text,
 	`notes` text,
-	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE cascade ON DELETE cascade,
 	CONSTRAINT "ck_property_legal_records_registration_status" CHECK("property_legal_records"."registration_status" in ('regular', 'irregular')),
 	CONSTRAINT "ck_legal_irregularity" CHECK("property_legal_records"."irregularity_description" IS NULL OR "property_legal_records"."registration_status" = 'irregular')
 );
@@ -338,7 +340,7 @@ CREATE TABLE `property_manual_rentals` (
 	`tenant_name` text,
 	`monthly_rent_cents` integer DEFAULT 0 NOT NULL,
 	`due_day` integer,
-	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE cascade ON DELETE cascade,
 	CONSTRAINT "ck_manual_rentals_values" CHECK("property_manual_rentals"."monthly_rent_cents" >= 0 AND ("property_manual_rentals"."due_day" IS NULL OR "property_manual_rentals"."due_day" BETWEEN 1 AND 31))
 );
 --> statement-breakpoint
@@ -349,8 +351,8 @@ CREATE TABLE `property_photos` (
 	`file_id` text NOT NULL,
 	`position` integer DEFAULT 0 NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`property_id`,`organization_id`) REFERENCES `properties`(`id`,`organization_id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`file_id`,`organization_id`) REFERENCES `stored_files`(`id`,`organization_id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`property_id`,`organization_id`) REFERENCES `properties`(`id`,`organization_id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`file_id`,`organization_id`) REFERENCES `stored_files`(`id`,`organization_id`) ON UPDATE cascade ON DELETE no action
 );
 --> statement-breakpoint
 CREATE INDEX `ix_property_photos_property_id_position` ON `property_photos` (`property_id`,`position`);--> statement-breakpoint
@@ -365,7 +367,7 @@ CREATE TABLE `property_proposals` (
 	`contact` text,
 	`notes` text,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`property_id`) REFERENCES `properties`(`id`) ON UPDATE cascade ON DELETE cascade,
 	CONSTRAINT "ck_property_proposals_proposal_type" CHECK("property_proposals"."proposal_type" in ('purchase', 'sale', 'rental', 'linked', 'informal')),
 	CONSTRAINT "ck_proposals_amount" CHECK("property_proposals"."amount_cents" > 0)
 );
@@ -401,9 +403,9 @@ CREATE TABLE `reservations` (
 	`notes` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`property_id`,`organization_id`) REFERENCES `properties`(`id`,`organization_id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`occupant_id`,`organization_id`) REFERENCES `occupants`(`id`,`organization_id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`contract_id`,`property_id`) REFERENCES `contracts`(`id`,`property_id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`property_id`,`organization_id`) REFERENCES `properties`(`id`,`organization_id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`occupant_id`,`organization_id`) REFERENCES `occupants`(`id`,`organization_id`) ON UPDATE cascade ON DELETE no action,
+	FOREIGN KEY (`contract_id`,`property_id`) REFERENCES `contracts`(`id`,`property_id`) ON UPDATE cascade ON DELETE no action,
 	CONSTRAINT "ck_reservations_status" CHECK("reservations"."status" in ('confirmed', 'cancelled')),
 	CONSTRAINT "ck_reservations_dates" CHECK("reservations"."check_out" > "reservations"."check_in"),
 	CONSTRAINT "ck_reservations_total" CHECK("reservations"."total_amount_cents" >= 0)
@@ -424,9 +426,9 @@ CREATE TABLE `sessions` (
 	`impersonated_by_id` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`active_organization_id`) REFERENCES `organizations`(`id`) ON UPDATE no action ON DELETE set null,
-	FOREIGN KEY (`impersonated_by_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE set null
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`active_organization_id`) REFERENCES `organizations`(`id`) ON UPDATE cascade ON DELETE set null,
+	FOREIGN KEY (`impersonated_by_id`) REFERENCES `users`(`id`) ON UPDATE cascade ON DELETE set null
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `sessions_token_unique` ON `sessions` (`token`);--> statement-breakpoint
@@ -443,8 +445,8 @@ CREATE TABLE `stored_files` (
 	`mime_type` text NOT NULL,
 	`size_bytes` integer NOT NULL,
 	`created_at` integer NOT NULL,
-	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`organization_id`,`uploaded_by_id`) REFERENCES `members`(`organization_id`,`user_id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`organization_id`,`uploaded_by_id`) REFERENCES `members`(`organization_id`,`user_id`) ON UPDATE cascade ON DELETE no action,
 	CONSTRAINT "ck_stored_files_size" CHECK("stored_files"."size_bytes" >= 0)
 );
 --> statement-breakpoint
@@ -472,8 +474,8 @@ CREATE TABLE `transactions` (
 	`recurrence_ends_on` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
-	FOREIGN KEY (`property_id`,`organization_id`) REFERENCES `properties`(`id`,`organization_id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`category_id`) REFERENCES `transaction_categories`(`id`) ON UPDATE no action ON DELETE restrict,
+	FOREIGN KEY (`property_id`,`organization_id`) REFERENCES `properties`(`id`,`organization_id`) ON UPDATE cascade ON DELETE cascade,
+	FOREIGN KEY (`category_id`) REFERENCES `transaction_categories`(`id`) ON UPDATE cascade ON DELETE restrict,
 	CONSTRAINT "ck_transactions_amount" CHECK("transactions"."amount_cents" > 0),
 	CONSTRAINT "ck_transactions_recurrence" CHECK("transactions"."recurrence_ends_on" IS NULL OR ("transactions"."is_recurring" AND "transactions"."recurrence_ends_on" >= "transactions"."occurred_on"))
 );

@@ -1,4 +1,4 @@
-import type { AuditAction, AuditEntityType } from "../../generated/prisma/enums.js";
+import type { AuditAction, AuditEntityType } from "../../db/enums.js";
 import type { AuditRepository } from "./audit.repository.js";
 
 export interface AuditEvent {

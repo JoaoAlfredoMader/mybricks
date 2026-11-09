@@ -1,5 +1,5 @@
 import { type Context, Hono } from "hono";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { requireAuth } from "../../shared/http/auth.middleware.js";
 import { audited, recordAudit } from "../../shared/http/audit.middleware.js";
@@ -32,8 +32,8 @@ async function auditListingChange(c: Context<AppEnv>, result: PropertyWriteResul
 }
 
 /** Route layer: HTTP binding (path, validation, serialization). */
-export function createPropertiesRoutes(prisma: PrismaClient) {
-  const controller = createPropertiesController(createPropertiesService(createPropertiesRepository(prisma)));
+export function createPropertiesRoutes(db: Database) {
+  const controller = createPropertiesController(createPropertiesService(createPropertiesRepository(db)));
 
   return new Hono<AppEnv>()
     .use(requireAuth)

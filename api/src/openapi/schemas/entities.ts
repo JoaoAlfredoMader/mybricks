@@ -14,7 +14,7 @@ import {
   ReservationStatus,
   TransactionType,
   UsageType,
-} from "../../generated/prisma/enums.js";
+} from "../../db/enums.js";
 import type { AgencyDto } from "../../modules/agencies/agencies.service.js";
 import type { ClientDto } from "../../modules/clients/clients.dto.js";
 import type { ContractCreatedDto, ContractDto } from "../../modules/contracts/contracts.dto.js";
