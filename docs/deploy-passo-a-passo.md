@@ -7,12 +7,12 @@ O código já está pronto (ver [deploy-cloudflare.md](deploy-cloudflare.md) par
 1. Crie a conta em cloudflare.com e confirme o e-mail.
 2. **Add a domain** → `mybricks.com.br` → plano **Free**. A Cloudflare mostra dois *nameservers* (algo como `xxx.ns.cloudflare.com`).
 3. No **Registro.br** (Painel → o domínio → DNS → *Alterar servidores DNS*), troque os servidores pelos dois da Cloudflare. A ativação leva de minutos a algumas horas; a Cloudflare avisa por e-mail.
-4. Com o domínio ativo, em **DNS → Records**, crie dois registros **com a nuvem laranja (proxied)**. Eles não apontam para lugar nenhum de verdade: só fazem o tráfego passar pela Cloudflare, onde os Workers respondem.
-
-   | Tipo | Nome | Conteúdo |
-   |---|---|---|
-   | AAAA | `@` | `100::` |
-   | AAAA | `staging` | `100::` |
+4. Em **DNS → Records**, confira os registros que a Cloudflare importou do domínio:
+   - Os registros `A` do `mybricks.com.br` (o site antigo) **já com a nuvem laranja** bastam para a rota do Worker funcionar: ela responde antes do servidor antigo. Deixe-os até o deploy; depois podem ser apagados.
+   - Se o apex **não** tiver nenhum registro proxied, crie `AAAA` `@` → `100::` (nuvem laranja). Ele não aponta para lugar nenhum de verdade: só faz o tráfego passar pela Cloudflare.
+   - Crie sempre, para a homologação: `AAAA` `staging` → `100::`, com a nuvem laranja.
+   - Mantenha `_dmarc` (política de e-mail). Ignore o aviso "add an MX record": só serve para *receber* e-mail no domínio.
+   - O `www` fica de fora das rotas (o login só confia em `mybricks.com.br`): depois do deploy, crie em **Rules → Redirect Rules** um redirecionamento de `www.mybricks.com.br` para `https://mybricks.com.br`.
 
 5. **Workers & Pages → Plans** → assine o **Workers Paid** (US$ 5/mês). Sem ele, o limite de 10 ms de CPU por requisição provavelmente derruba o login (hash de senha).
 6. **R2** → ative (pede um cartão; o uso do MyBricks fica na faixa gratuita).
