@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// MyBricks — Database schema v3 (PostgreSQL) — DBML for dbdiagram.io
+// MyBricks — Database schema v3 — DBML for dbdiagram.io. Design reference only: written for PostgreSQL; the source of truth now is src/db/schema.ts (SQLite/D1: text uuids, integer cents, text dates).
 // ═══════════════════════════════════════════════════════════════════════════
 // Conventions
 //  - Tables: plural snake_case. Columns: snake_case. Enum values: snake_case.

@@ -268,17 +268,3 @@ export function createDemoSeeder(db: Database, { today = startOfToday }: DemoSee
     },
   };
 }
-
-/** A summary of what a plan contains, for logs and tests. */
-export function describePlan(plan: DemoPlan): Record<string, number> {
-  return {
-    agencies: plan.agencies.length,
-    clients: plan.clients.length,
-    occupants: plan.occupants.length,
-    properties: plan.properties.length,
-    contracts: plan.contracts.length,
-    reservations: plan.reservations.length,
-    transactions: plan.transactions.length,
-    proposals: plan.proposals.length,
-  };
-}
