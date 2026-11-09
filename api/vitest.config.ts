@@ -25,6 +25,9 @@ export default defineConfig({
     env: {
       NODE_ENV: "test",
       DATABASE_URL: testDatabaseUrl(),
+      // Deterministic whatever the developer's .env says: e-mail is only printed, nobody has to confirm it.
+      EMAIL_DRIVER: "log",
+      REQUIRE_EMAIL_VERIFICATION: "false",
       STORAGE_DRIVER: "local",
       STORAGE_DIR: TEST_STORAGE_DIR,
       // Small on purpose, so the "too large" scenarios do not need big buffers.

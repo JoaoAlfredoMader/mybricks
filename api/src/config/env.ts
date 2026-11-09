@@ -33,6 +33,14 @@ const envSchema = z
     MAINTENANCE_INTERVAL_MINUTES: z.coerce.number().int().min(0).default(60),
     /** Largest accepted upload, in megabytes. */
     MAX_UPLOAD_MB: z.coerce.number().positive().max(100).default(15),
+    /** How e-mail leaves: printed in the console (development) or sent through Resend. */
+    EMAIL_DRIVER: z.enum(["log", "resend"]).default("log"),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    /** Sender, `Name <address>`; the domain has to be verified in Resend. */
+    EMAIL_FROM: z.string().min(3).default("MyBricks <nao-responder@mybricks.com.br>"),
+    EMAIL_REPLY_TO: z.string().email().optional(),
+    /** Whether e-mail sign-in waits for the confirmation link. On by default as soon as e-mail really goes out. */
+    REQUIRE_EMAIL_VERIFICATION: z.enum(["true", "false"]).optional(),
     /** The platform's WhatsApp, where every listing card leads (`wa.me` format: country code + area code + number, digits only). */
     LISTINGS_WHATSAPP_NUMBER: z
       .string()
@@ -40,11 +48,24 @@ const envSchema = z
       .default(DEFAULT_LISTINGS_WHATSAPP_NUMBER),
   })
   .superRefine((env, context) => {
-    if (env.STORAGE_DRIVER !== "s3") return;
-    for (const key of ["S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const) {
-      if (!env[key]) context.addIssue({ code: "custom", path: [key], message: `${key} is required when STORAGE_DRIVER=s3` });
+    if (env.STORAGE_DRIVER === "s3") {
+      for (const key of ["S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] as const) {
+        if (!env[key]) context.addIssue({ code: "custom", path: [key], message: `${key} is required when STORAGE_DRIVER=s3` });
+      }
     }
-  });
+    if (env.EMAIL_DRIVER === "resend" && !env.RESEND_API_KEY) {
+      context.addIssue({ code: "custom", path: ["RESEND_API_KEY"], message: "RESEND_API_KEY is required when EMAIL_DRIVER=resend" });
+    }
+    if (env.NODE_ENV === "production" && env.EMAIL_DRIVER !== "resend") {
+      context.addIssue({ code: "custom", path: ["EMAIL_DRIVER"], message: "EMAIL_DRIVER=resend is required in production: nobody could confirm an e-mail otherwise" });
+    }
+  })
+  .transform((env) => ({
+    ...env,
+    REQUIRE_EMAIL_VERIFICATION: env.REQUIRE_EMAIL_VERIFICATION
+      ? env.REQUIRE_EMAIL_VERIFICATION === "true"
+      : env.EMAIL_DRIVER === "resend",
+  }));
 
 export type Env = z.infer<typeof envSchema>;
 
