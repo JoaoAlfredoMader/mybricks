@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, it } from "vitest";
 import { computeIrr } from "../../src/modules/kpis/kpi-calculations.js";
 import { near } from "../helpers/near.js";
 import { check } from "../helpers/check.js";
-import { Session, prisma, resetDatabase, signUp } from "../helpers/world.js";
+import { members } from "../../src/db/schema.js";
+import { Session, close, db, resetDatabase, signUp } from "../helpers/world.js";
 
 const AS_OF = "2026-06-15";
 
@@ -16,7 +17,7 @@ describe("KPIs API", () => {
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   beforeAll(resetDatabase);
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("sets up the scenario", async () => {
     const anon = new Session();
@@ -26,7 +27,7 @@ describe("KPIs API", () => {
     ana = await signUp("Ana Souza", "ana@example.com");
     bia = await signUp("Bia Lima", "bia@example.com");
     carlos = await signUp("Carlos Dias", "carlos@example.com");
-    await prisma.member.create({ data: { organizationId: ana.organizationId, userId: bia.userId, role: "member" } });
+    await db.insert(members).values({ organizationId: ana.organizationId, userId: bia.userId, role: "member" });
     await bia.session.call("POST", "/api/auth/organization/set-active", { organizationId: ana.organizationId });
 
     const mk = async (who: typeof ana, body: Record<string, unknown>) => {

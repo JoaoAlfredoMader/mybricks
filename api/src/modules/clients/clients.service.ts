@@ -33,7 +33,7 @@ function assertDocumentMatchesPersonType(personType: PersonType, document: strin
   }
 }
 
-/** Service layer: business rules. No HTTP, no Prisma. */
+/** Service layer: business rules. No HTTP, no database. */
 export function createClientsService(repository: ClientsRepository): ClientsService {
   return {
     async list(tenant, { page, pageSize, search, personType }) {

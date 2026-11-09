@@ -22,7 +22,12 @@ export default async function setup(project: TestProject): Promise<() => Promise
   // Teardown: the database and the files the tests uploaded.
   const storageDir = project.config.env.STORAGE_DIR;
   return async () => {
-    await Promise.all([file, `${file}-journal`, `${file}-wal`, `${file}-shm`].map((path) => rm(path, { force: true })));
+    // A worker may still hold the file for a moment on Windows; it is a temp file, so a leftover is harmless.
+    await Promise.all(
+      [file, `${file}-journal`, `${file}-wal`, `${file}-shm`].map((path) =>
+        rm(path, { force: true, maxRetries: 5, retryDelay: 200 }).catch(() => undefined),
+      ),
+    );
     if (storageDir) await rm(storageDir, { recursive: true, force: true });
   };
 }

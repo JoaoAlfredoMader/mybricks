@@ -1,4 +1,4 @@
-// Generated once from prisma/schema.prisma by a converter, then maintained by hand.
+// Started from the former Prisma schema by a one-off converter, then maintained by hand.
 // SQLite (Cloudflare D1). Ids are UUID text created by the application; money is integer cents
 // (bigint in the app); calendar days are text (YYYY-MM-DD); moments are epoch milliseconds.
 import { relations, sql } from "drizzle-orm";

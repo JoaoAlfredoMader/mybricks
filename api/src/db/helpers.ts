@@ -15,7 +15,7 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
 
 /** Escapes `%`, `_` and the escape character itself, so user text is matched literally by LIKE. */
 export function escapeLike(term: string): string {
-  return term.replace(/[\%_]/g, (char) => `\${char}`);
+  return term.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 
 /**
@@ -23,7 +23,7 @@ export function escapeLike(term: string): string {
  * for ASCII letters, which covers names and e-mails; accented capitals are not folded.
  */
 export function containsInsensitive(column: SQLWrapper, term: string): SQL {
-  return sql`${column} LIKE ${`%${escapeLike(term)}%`} ESCAPE '\'`;
+  return sql`${column} LIKE ${`%${escapeLike(term)}%`} ESCAPE '\\'`;
 }
 
 /** Case-sensitive "contains" (documents are stored upper case and searched upper case). */

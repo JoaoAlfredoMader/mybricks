@@ -1,19 +1,9 @@
-import type { Prisma } from "../../generated/prisma/client.js";
+import { type SQL, and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import type { Database } from "../../db/database.js";
 import type { ProposalType } from "../../db/enums.js";
-import type { PrismaClient } from "../../lib/prisma.js";
+import { properties, propertyProposals } from "../../db/schema.js";
 
-const select = {
-  id: true,
-  propertyId: true,
-  proposalType: true,
-  amountCents: true,
-  proposalDate: true,
-  contact: true,
-  notes: true,
-  createdAt: true,
-} satisfies Prisma.PropertyProposalSelect;
-
-export type ProposalRecord = Prisma.PropertyProposalGetPayload<{ select: typeof select }>;
+export type ProposalRecord = typeof propertyProposals.$inferSelect;
 
 /** Proposals belong to a property: members only reach those of properties they created. */
 export interface ProposalScope {
@@ -42,69 +32,72 @@ export interface ProposalsRepository {
   delete(scope: ProposalScope, propertyId: string, id: string): Promise<boolean>;
 }
 
-/** The proposal is reached through its property, so the tenant and visibility filter sit on the property. */
-function whereFor(scope: ProposalScope, propertyId: string): Prisma.PropertyProposalWhereInput {
-  return {
-    propertyId,
-    property: {
-      organizationId: scope.organizationId,
-      ...(scope.propertyCreatedById ? { createdById: scope.propertyCreatedById } : {}),
-    },
-  };
-}
+/** Repository layer: the only place that talks to the database. */
+export function createProposalsRepository(db: Database): ProposalsRepository {
+  const propertyScope = (scope: ProposalScope): SQL =>
+    and(
+      eq(properties.organizationId, scope.organizationId),
+      scope.propertyCreatedById ? eq(properties.createdById, scope.propertyCreatedById) : undefined,
+    ) as SQL;
 
-/** Repository layer: the only place that talks to Prisma. */
-export function createProposalsRepository(prisma: PrismaClient): ProposalsRepository {
+  /** The proposal is reached through its property, so the tenant and visibility filter sit on the property. */
+  const whereFor = (scope: ProposalScope, propertyId: string): SQL =>
+    and(
+      eq(propertyProposals.propertyId, propertyId),
+      inArray(propertyProposals.propertyId, db.select({ id: properties.id }).from(properties).where(propertyScope(scope))),
+    ) as SQL;
+
+  async function findById(scope: ProposalScope, propertyId: string, id: string): Promise<ProposalRecord | null> {
+    const [row] = await db.select().from(propertyProposals).where(and(whereFor(scope, propertyId), eq(propertyProposals.id, id)));
+    return row ?? null;
+  }
+
   return {
     async propertyVisible(scope, propertyId) {
-      const count = await prisma.property.count({
-        where: {
-          id: propertyId,
-          organizationId: scope.organizationId,
-          ...(scope.propertyCreatedById ? { createdById: scope.propertyCreatedById } : {}),
-        },
-      });
-      return count > 0;
+      const [row] = await db.select({ id: properties.id }).from(properties).where(and(propertyScope(scope), eq(properties.id, propertyId)));
+      return row !== undefined;
     },
 
     async list(scope, propertyId, { proposalType, skip, take }) {
-      const where: Prisma.PropertyProposalWhereInput = {
-        ...whereFor(scope, propertyId),
-        ...(proposalType ? { proposalType } : {}),
-      };
-      const [items, total] = await Promise.all([
-        prisma.propertyProposal.findMany({
-          where,
-          select,
-          orderBy: [{ proposalDate: "desc" }, { createdAt: "desc" }, { id: "asc" }],
-          skip,
-          take,
-        }),
-        prisma.propertyProposal.count({ where }),
+      const where = and(whereFor(scope, propertyId), proposalType ? eq(propertyProposals.proposalType, proposalType) : undefined) as SQL;
+      const [items, [total]] = await Promise.all([
+        db
+          .select()
+          .from(propertyProposals)
+          .where(where)
+          .orderBy(desc(propertyProposals.proposalDate), desc(propertyProposals.createdAt), asc(propertyProposals.id))
+          .limit(take)
+          .offset(skip),
+        db.select({ value: count() }).from(propertyProposals).where(where),
       ]);
-      return { items, total };
+      return { items, total: total?.value ?? 0 };
     },
 
-    findById(scope, propertyId, id) {
-      return prisma.propertyProposal.findFirst({ where: { ...whereFor(scope, propertyId), id }, select });
-    },
+    findById,
 
-    create(propertyId, data) {
-      return prisma.propertyProposal.create({ data: { ...data, propertyId }, select });
+    async create(propertyId, data) {
+      const [created] = await db.insert(propertyProposals).values({ ...data, propertyId }).returning();
+      if (!created) throw new Error("The proposal that was just created could not be read back");
+      return created;
     },
 
     async update(scope, propertyId, id, patch) {
-      const { count } = await prisma.propertyProposal.updateMany({
-        where: { ...whereFor(scope, propertyId), id },
-        data: patch,
-      });
-      if (count === 0) return null;
-      return prisma.propertyProposal.findFirst({ where: { ...whereFor(scope, propertyId), id }, select });
+      // `.set()` refuses an empty object; an empty patch changes nothing and just answers with the row.
+      if (Object.values(patch).every((value) => value === undefined)) return findById(scope, propertyId, id);
+      const [row] = await db
+        .update(propertyProposals)
+        .set(patch)
+        .where(and(whereFor(scope, propertyId), eq(propertyProposals.id, id)))
+        .returning();
+      return row ?? null;
     },
 
     async delete(scope, propertyId, id) {
-      const { count } = await prisma.propertyProposal.deleteMany({ where: { ...whereFor(scope, propertyId), id } });
-      return count > 0;
+      const removed = await db
+        .delete(propertyProposals)
+        .where(and(whereFor(scope, propertyId), eq(propertyProposals.id, id)))
+        .returning({ id: propertyProposals.id });
+      return removed.length > 0;
     },
   };
 }

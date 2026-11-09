@@ -1,4 +1,6 @@
-import type { PrismaClient } from "../../lib/prisma.js";
+import { eq } from "drizzle-orm";
+import type { Database } from "../../db/database.js";
+import { users } from "../../db/schema.js";
 import type { Auth } from "./auth.js";
 
 export interface PlatformAdminInput {
@@ -21,16 +23,16 @@ export interface PlatformAdminResult {
  * (Better Auth's admin plugin); being the owner of an organization never grants it.
  */
 export async function ensurePlatformAdmin(
-  { auth, prisma }: { auth: Auth; prisma: PrismaClient },
+  { auth, db }: { auth: Auth; db: Database },
   { email, name, password }: PlatformAdminInput,
 ): Promise<PlatformAdminResult> {
   const normalized = email.trim().toLowerCase();
-  const existing = await prisma.user.findUnique({ where: { email: normalized }, select: { id: true, role: true } });
+  const [existing] = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.email, normalized));
 
   if (existing) {
     const alreadyAdmin = (existing.role ?? "").split(",").some((role) => role.trim() === "admin");
     if (alreadyAdmin) return { created: false, promoted: false };
-    await prisma.user.update({ where: { id: existing.id }, data: { role: "admin" } });
+    await db.update(users).set({ role: "admin" }).where(eq(users.id, existing.id));
     return { created: false, promoted: true };
   }
 
@@ -39,6 +41,6 @@ export async function ensurePlatformAdmin(
   // account gets its personal organization like any other user.
   await auth.api.signUpEmail({ body: { name, email: normalized, password } });
   // The operator is created from the console, by someone who controls the server: no link to click.
-  await prisma.user.update({ where: { email: normalized }, data: { role: "admin", emailVerified: true } });
+  await db.update(users).set({ role: "admin", emailVerified: true }).where(eq(users.email, normalized));
   return { created: true, promoted: false };
 }

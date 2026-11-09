@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { check } from "../helpers/check.js";
-import { Session, app, env, prisma, resetDatabase } from "../helpers/world.js";
+import { count, eq } from "drizzle-orm";
+import { members, organizations, properties, users } from "../../src/db/schema.js";
+import { Session, app, close, db, env, resetDatabase } from "../helpers/world.js";
 
 /**
  * One scenario told in order: each test builds on the data of the previous ones,
@@ -12,7 +14,7 @@ describe("Authentication API", () => {
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   beforeAll(resetDatabase);
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("unauthenticated", async () => {
     const anon = new Session();
@@ -29,7 +31,7 @@ describe("Authentication API", () => {
     check("personal organization active", Boolean(meAna.json?.organizationId), meAna.json);
     check("member role is owner", meAna.json?.memberRole === "owner", meAna.json);
     check("not anonymous, platform role user", meAna.json?.user?.isAnonymous === false && meAna.json?.user?.platformRole === "user", meAna.json?.user);
-    const orgAna = await prisma.organization.findUnique({ where: { id: meAna.json?.organizationId } });
+    const [orgAna] = await db.select().from(organizations).where(eq(organizations.id, meAna.json?.organizationId));
     check("organization named after the user, not demo", orgAna?.name === "Portfólio de Ana" && orgAna.isDemo === false, orgAna);
   });
 
@@ -49,7 +51,7 @@ describe("Authentication API", () => {
     check("anonymous sign-in -> 200", g.status === 200, g);
     const meGuest = await guest.call("GET", "/api/me");
     check("guest flagged anonymous", meGuest.json?.user?.isAnonymous === true, meGuest.json);
-    demo = await prisma.organization.findUnique({ where: { id: meGuest.json?.organizationId } });
+    [demo] = await db.select().from(organizations).where(eq(organizations.id, meGuest.json?.organizationId));
     check("guest workspace is a demo that expires", demo?.isDemo === true && demo.demoExpiresAt !== null && demo.demoExpiresAt.getTime() > Date.now(), demo);
     const ttlHours = demo?.demoExpiresAt ? (demo.demoExpiresAt.getTime() - Date.now()) / 3_600_000 : 0;
     check("demo TTL close to DEMO_TTL_HOURS", ttlHours > env.DEMO_TTL_HOURS - 0.1 && ttlHours <= env.DEMO_TTL_HOURS, ttlHours);
@@ -57,9 +59,10 @@ describe("Authentication API", () => {
     // guest creates data (directly, there are no domain routes yet)
     guestId = meGuest.json.user.id as string;
     demoId = meGuest.json.organizationId as string;
-    property = await prisma.property.create({
-      data: { organizationId: demoId, createdById: guestId, name: "Imóvel do convidado", propertyType: "residential", usageType: "rental" },
-    });
+    [property] = await db
+      .insert(properties)
+      .values({ organizationId: demoId, createdById: guestId, name: "Imóvel do convidado", propertyType: "residential", usageType: "rental" })
+      .returning();
   });
 
   it("guest signs up for real: workspace is adopted", async () => {
@@ -68,13 +71,13 @@ describe("Authentication API", () => {
     const meBruno = await guest.call("GET", "/api/me");
     check("linked user is no longer anonymous", meBruno.json?.user?.isAnonymous === false && meBruno.json?.user?.email === "bruno@example.com", meBruno.json);
     check("adopted the demo organization", meBruno.json?.organizationId === demoId, { got: meBruno.json?.organizationId, demoId });
-    const adopted = await prisma.organization.findUnique({ where: { id: demoId } });
+    const [adopted] = await db.select().from(organizations).where(eq(organizations.id, demoId));
     check("adopted organization is permanent and renamed", adopted?.isDemo === false && adopted.demoExpiresAt === null && adopted.name === "Portfólio de Bruno", adopted);
-    const moved = await prisma.property.findUnique({ where: { id: property.id } });
+    const [moved] = await db.select().from(properties).where(eq(properties.id, property.id));
     check("authorship followed to the new user (ON UPDATE CASCADE)", moved?.createdById === meBruno.json?.user?.id, moved);
-    const brunoOrgs = await prisma.member.count({ where: { userId: meBruno.json?.user?.id } });
+    const brunoOrgs = (await db.select({ value: count() }).from(members).where(eq(members.userId, meBruno.json?.user?.id)))[0]?.value;
     check("new user has exactly one organization", brunoOrgs === 1, brunoOrgs);
-    check("anonymous user was deleted", (await prisma.user.count({ where: { id: guestId } })) === 0);
+    check("anonymous user was deleted", (await db.select({ value: count() }).from(users).where(eq(users.id, guestId)))[0]?.value === 0);
     check("member role is owner after adoption", meBruno.json?.memberRole === "owner", meBruno.json);
   });
 
@@ -94,7 +97,7 @@ describe("Authentication API", () => {
   it("admin plugin: platform role", async () => {
     const denied = await ana.call("GET", "/api/auth/admin/list-users?limit=5");
     check("normal user cannot use admin endpoints", denied.status === 403 || denied.status === 401, denied.status);
-    await prisma.user.update({ where: { email: "ana@example.com" }, data: { role: "admin" } });
+    await db.update(users).set({ role: "admin" }).where(eq(users.email, "ana@example.com"));
     const ana3 = new Session();
     await ana3.call("POST", "/api/auth/sign-in/email", { email: "ana@example.com", password: "senha-forte-123" });
     const listed = await ana3.call("GET", "/api/auth/admin/list-users?limit=10");

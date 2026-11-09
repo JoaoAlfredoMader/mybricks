@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { check } from "../helpers/check.js";
-import { type Account, Session, createCast, prisma, resetDatabase } from "../helpers/world.js";
+import { count, eq } from "drizzle-orm";
+import { feedbacks, properties, users } from "../../src/db/schema.js";
+import { type Account, Session, close, createCast, db, resetDatabase } from "../helpers/world.js";
 
 /**
  * One scenario told in order: each test builds on the data of the previous ones,
@@ -17,7 +19,7 @@ describe("Feedback, platform admin and impersonation", () => {
   beforeAll(async () => {
     await resetDatabase();
   });
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("requires a session", async () => {
     const anon = new Session();
@@ -31,7 +33,7 @@ describe("Feedback, platform admin and impersonation", () => {
     const sent = await bia.session.call("POST", "/api/feedback", { message: "  O mapa demora a carregar.  " });
     check("send -> 201, open, trimmed", sent.status === 201 && sent.json.status === "open" && sent.json.message === "O mapa demora a carregar.", sent);
     first = sent.json;
-    check("it is stored for the author in the organization she is working in", (await prisma.feedback.findUnique({ where: { id: first.id } }))?.organizationId === ana.organizationId);
+    check("it is stored for the author in the organization she is working in", (await db.select().from(feedbacks).where(eq(feedbacks.id, first.id)))[0]?.organizationId === ana.organizationId);
     check("another message from the owner", (await ana.session.call("POST", "/api/feedback", { message: "Faltou um botão de exportar." })).status === 201);
     check("another one from the outsider", (await carlos.session.call("POST", "/api/feedback", { message: "Gostei do painel!" })).status === 201);
 
@@ -55,7 +57,7 @@ describe("Feedback, platform admin and impersonation", () => {
     check("a normal user cannot change a status (403)", (await bia.session.call("PATCH", `/api/admin/feedback/${first.id}`, { status: "resolved" })).status === 403);
     check("being the organization owner does not make anyone a platform admin", (await ana.session.call("GET", "/api/admin/feedback")).json?.error?.code === "FORBIDDEN");
 
-    await prisma.user.update({ where: { email: "ana@example.com" }, data: { role: "admin" } });
+    await db.update(users).set({ role: "admin" }).where(eq(users.email, "ana@example.com"));
     admin = new Session();
     const signIn = await admin.call("POST", "/api/auth/sign-in/email", { email: "ana@example.com", password: "senha-forte-123" });
     check("the promoted user signs in again", signIn.status === 200, signIn);
@@ -91,7 +93,7 @@ describe("Feedback, platform admin and impersonation", () => {
     check("editing still works", (await admin.call("PATCH", `/api/properties/${property.json.id}`, { name: "Renomeado" })).status === 200);
     const blocked = await admin.call("DELETE", `/api/properties/${property.json.id}`);
     check("deleting is blocked (403)", blocked.status === 403 && blocked.json?.error?.code === "FORBIDDEN", blocked);
-    check("the property is still there", (await prisma.property.count({ where: { id: property.json.id } })) === 1);
+    check("the property is still there", (await db.select({ value: count() }).from(properties).where(eq(properties.id, property.json.id)))[0]?.value === 1);
     check("the operator panel is closed while impersonating a non-admin", (await admin.call("GET", "/api/admin/feedback")).status === 403);
 
     const stop = await admin.call("POST", "/api/auth/admin/stop-impersonating", {});

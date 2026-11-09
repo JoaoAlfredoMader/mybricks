@@ -1,5 +1,8 @@
-import { Prisma } from "../../generated/prisma/client.js";
-import type { PrismaClient } from "../../lib/prisma.js";
+import { and, asc, count, eq } from "drizzle-orm";
+import type { Database } from "../../db/database.js";
+import { isUniqueViolation } from "../../db/errors.js";
+import { containsInsensitive } from "../../db/helpers.js";
+import { agencies, properties } from "../../db/schema.js";
 import { AppError } from "../../shared/errors/app-error.js";
 
 export interface AgencyRecord {
@@ -19,38 +22,44 @@ export interface AgenciesRepository {
   delete(organizationId: string, id: string): Promise<boolean>;
 }
 
-const select = { id: true, name: true } satisfies Prisma.AgencySelect;
+const columns = { id: agencies.id, name: agencies.name };
 
 /** `(organization_id, name)` is unique: two agencies with the same name are a conflict. */
 function translateWriteError(error: unknown): never {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+  if (isUniqueViolation(error, "name")) {
     throw AppError.conflict("An agency with this name already exists", { field: "name" });
   }
   throw error;
 }
 
-/** Repository layer: the only place that talks to Prisma. Agencies belong to the organization, not to a member. */
-export function createAgenciesRepository(prisma: PrismaClient): AgenciesRepository {
+/** Repository layer: the only place that talks to the database. Agencies belong to the organization, not to a member. */
+export function createAgenciesRepository(db: Database): AgenciesRepository {
   return {
     async list(organizationId, { search, skip, take }) {
-      const where: Prisma.AgencyWhereInput = {
-        organizationId,
-        ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
-      };
-      const [items, total] = await Promise.all([
-        prisma.agency.findMany({ where, select, orderBy: [{ name: "asc" }, { id: "asc" }], skip, take }),
-        prisma.agency.count({ where }),
+      const where = and(
+        eq(agencies.organizationId, organizationId),
+        search ? containsInsensitive(agencies.name, search) : undefined,
+      );
+      const [items, [totalRow]] = await Promise.all([
+        db.select(columns).from(agencies).where(where).orderBy(asc(agencies.name), asc(agencies.id)).limit(take).offset(skip),
+        db.select({ value: count() }).from(agencies).where(where),
       ]);
-      return { items, total };
+      return { items, total: totalRow?.value ?? 0 };
     },
 
-    findById(organizationId, id) {
-      return prisma.agency.findFirst({ where: { id, organizationId }, select });
+    async findById(organizationId, id) {
+      const [row] = await db
+        .select(columns)
+        .from(agencies)
+        .where(and(eq(agencies.id, id), eq(agencies.organizationId, organizationId)))
+        .limit(1);
+      return row ?? null;
     },
 
     async create(organizationId, name) {
       try {
-        return await prisma.agency.create({ data: { organizationId, name }, select });
+        const [row] = await db.insert(agencies).values({ organizationId, name }).returning(columns);
+        return row!;
       } catch (error) {
         return translateWriteError(error);
       }
@@ -58,21 +67,31 @@ export function createAgenciesRepository(prisma: PrismaClient): AgenciesReposito
 
     async update(organizationId, id, name) {
       try {
-        const { count } = await prisma.agency.updateMany({ where: { id, organizationId }, data: { name } });
-        if (count === 0) return null;
-        return await prisma.agency.findFirst({ where: { id, organizationId }, select });
+        const [row] = await db
+          .update(agencies)
+          .set({ name })
+          .where(and(eq(agencies.id, id), eq(agencies.organizationId, organizationId)))
+          .returning(columns);
+        return row ?? null;
       } catch (error) {
         return translateWriteError(error);
       }
     },
 
-    countProperties(organizationId, id) {
-      return prisma.property.count({ where: { organizationId, agencyId: id } });
+    async countProperties(organizationId, id) {
+      const [row] = await db
+        .select({ value: count() })
+        .from(properties)
+        .where(and(eq(properties.organizationId, organizationId), eq(properties.agencyId, id)));
+      return row?.value ?? 0;
     },
 
     async delete(organizationId, id) {
-      const { count } = await prisma.agency.deleteMany({ where: { id, organizationId } });
-      return count > 0;
+      const removed = await db
+        .delete(agencies)
+        .where(and(eq(agencies.id, id), eq(agencies.organizationId, organizationId)))
+        .returning({ id: agencies.id });
+      return removed.length > 0;
     },
   };
 }

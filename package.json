@@ -18,7 +18,6 @@
     "lint": "npm run lint -w app",
     "test": "npm run test -w api && npm run test -w app",
     "api:types": "npm run api:types -w app",
-    "db:up": "npm run db:up -w api",
     "db:migrate": "npm run db:migrate -w api"
   }
 }

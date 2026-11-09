@@ -1,7 +1,9 @@
+import { asc, count, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { check } from "../helpers/check.js";
 import { HTML_AS_IMAGE, JPEG, MIME, PDF, PNG, ZIP } from "../helpers/fixtures.js";
-import { type Account, Session, createCast, prisma, resetDatabase, storage } from "../helpers/world.js";
+import { auditLogs, propertyDocuments, storedFiles } from "../../src/db/schema.js";
+import { type Account, Session, close, createCast, db, resetDatabase, storage } from "../helpers/world.js";
 
 const documents = (propertyId: string) => `/api/properties/${propertyId}/documents`;
 const UNKNOWN = "00000000-0000-4000-8000-000000000000";
@@ -29,7 +31,7 @@ describe("Property documents API", () => {
   beforeAll(async () => {
     await resetDatabase();
   });
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("requires a session", async () => {
     const anon = new Session();
@@ -48,7 +50,7 @@ describe("Property documents API", () => {
     deed = first.json;
     check("DTO: name, type, size, trimmed category and the download URL", first.json?.fileName === "Escritura 2ª via.pdf" && first.json.mimeType === "application/pdf" && first.json.sizeBytes === PDF.length && first.json.category === "escritura" && first.json.contentUrl === `${documents(apto)}/${first.json.id}/content`, first.json);
 
-    const stored = await prisma.storedFile.findFirstOrThrow({ where: { documents: { some: { id: deed.id } } } });
+    const stored = (await db.select().from(storedFiles).innerJoin(propertyDocuments, eq(propertyDocuments.fileId, storedFiles.id)).where(eq(propertyDocuments.id, deed.id)))[0]!.stored_files;
     check("recorded for the organization and the uploader, under a generated key", stored.organizationId === ana.organizationId && stored.uploadedById === ana.userId && /\/[0-9a-f-]{36}\.pdf$/.test(stored.storageKey) && !stored.storageKey.includes("Escritura"), stored);
     check("the bytes are in the storage", (await storage.get(stored.storageKey))?.body.equals(PDF) === true);
 
@@ -82,7 +84,7 @@ describe("Property documents API", () => {
   });
 
   it("rejects what is not an acceptable document", async () => {
-    const before = await prisma.storedFile.count();
+    const before = (await db.select({ value: count() }).from(storedFiles))[0]!.value;
     const reject = async (name: string, status: number, code: string, file: Parameters<Session["upload"]>[1], fields?: Record<string, string>) => {
       const r = await ana.session.upload(documents(apto), file, fields);
       check(name, r.status === status && r.json?.error?.code === code, r);
@@ -95,7 +97,7 @@ describe("Property documents API", () => {
     await reject("plain text is not accepted -> 415", 415, "UNSUPPORTED_MEDIA_TYPE", { name: "a.txt", type: "text/plain", bytes: Buffer.from("hello") });
     await reject("a category over 50 characters -> 400", 400, "VALIDATION_ERROR", { name: "a.pdf", type: MIME.pdf, bytes: PDF }, { category: "x".repeat(51) });
     await reject("a file over the limit -> 413", 413, "PAYLOAD_TOO_LARGE", { name: "big.pdf", type: MIME.pdf, bytes: Buffer.concat([PDF, Buffer.alloc(2 * 1024 * 1024)]) });
-    check("nothing was left behind", (await prisma.storedFile.count()) === before);
+    check("nothing was left behind", (await db.select({ value: count() }).from(storedFiles))[0]!.value === before);
     check("unknown property -> 404", (await ana.session.upload(documents(UNKNOWN), { name: "a.pdf", type: MIME.pdf, bytes: PDF })).status === 404);
   });
 
@@ -131,17 +133,17 @@ describe("Property documents API", () => {
   });
 
   it("deletes the document, its record and its object", async () => {
-    const key = (await prisma.storedFile.findFirstOrThrow({ where: { documents: { some: { id: deed.id } } } })).storageKey;
+    const key = (await db.select({ storageKey: storedFiles.storageKey }).from(storedFiles).innerJoin(propertyDocuments, eq(propertyDocuments.fileId, storedFiles.id)).where(eq(propertyDocuments.id, deed.id)))[0]!.storageKey;
     const deleted = await ana.session.call("DELETE", `${documents(apto)}/${deed.id}`);
     check("delete -> 204", deleted.status === 204, deleted);
-    check("the file record and the object are gone", (await prisma.storedFile.count({ where: { storageKey: key } })) === 0 && (await storage.get(key)) === null);
+    check("the file record and the object are gone", (await db.select({ value: count() }).from(storedFiles).where(eq(storedFiles.storageKey, key)))[0]!.value === 0 && (await storage.get(key)) === null);
     check("the other copy of the same file is untouched", (await ana.session.call("GET", documents(apto))).json?.length === 5);
     check("delete twice -> 404", (await ana.session.call("DELETE", `${documents(apto)}/${deed.id}`)).status === 404);
     check("download after delete -> 404", (await ana.session.download(deed.contentUrl)).status === 404);
   });
 
   it("is audited as uploads, updates and deletions of documents", async () => {
-    const entries = await prisma.auditLog.findMany({ where: { entityType: "document" }, orderBy: { id: "asc" } });
+    const entries = await db.select().from(auditLogs).where(eq(auditLogs.entityType, "document")).orderBy(asc(auditLogs.id));
     const actions = entries.map((entry) => entry.action);
     check("uploads are recorded with the document id", actions.includes("upload") && entries.filter((e) => e.action === "upload").every((e) => e.entityId !== null), actions);
     check("relabels and deletions are recorded too", actions.includes("update") && actions.includes("delete"), actions);

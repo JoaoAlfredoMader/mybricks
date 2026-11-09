@@ -1,7 +1,13 @@
+import { type SQL, and, count, eq, inArray } from "drizzle-orm";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { afterAll, beforeAll, describe, it } from "vitest";
+import { auditLogs, cities, contractTemplates, contracts, storedFiles } from "../../src/db/schema.js";
 import { check } from "../helpers/check.js";
 import { countPdfPages, looksLikePdf } from "../helpers/pdf.js";
-import { type Account, Session, createCast, prisma, resetDatabase, storage } from "../helpers/world.js";
+import { type Account, Session, close, createCast, db, resetDatabase, storage } from "../helpers/world.js";
+
+/** Number of rows of a table that match the condition. */
+const countRows = async (table: SQLiteTable, where?: SQL) => (await db.select({ value: count() }).from(table).where(where))[0]!.value;
 
 const UNKNOWN = "00000000-0000-4000-8000-000000000000";
 
@@ -27,12 +33,20 @@ describe("Contract template and contract PDF API", () => {
     return r.json.id as string;
   };
   const keyOfPdf = async (id: string) =>
-    (await prisma.contract.findUniqueOrThrow({ where: { id }, select: { pdfFile: { select: { storageKey: true } } } })).pdfFile?.storageKey ?? null;
+    (
+      await db
+        .select({ storageKey: storedFiles.storageKey })
+        .from(contracts)
+        .leftJoin(storedFiles, eq(storedFiles.id, contracts.pdfFileId))
+        .where(eq(contracts.id, id))
+    )[0]?.storageKey ?? null;
+  const findCity = async (name: string, state: string) =>
+    (await db.select().from(cities).where(and(eq(cities.name, name), eq(cities.state, state))))[0]!;
 
   beforeAll(async () => {
     await resetDatabase();
   });
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("requires a session", async () => {
     const anon = new Session();
@@ -80,7 +94,7 @@ describe("Contract template and contract PDF API", () => {
   it("generates the PDF of a conventional contract", async () => {
     apto = await mkProperty(ana, {
       name: "Apto 1", usageType: "rental",
-      address: { cityId: (await prisma.city.findFirstOrThrow({ where: { name: "Campinas", state: "SP" } })).ibgeCode, street: "Rua Barão de Jaguara", number: "100", complement: "apto 12", neighborhood: "Centro", postalCode: "13015904" },
+      address: { cityId: (await findCity("Campinas", "SP")).ibgeCode, street: "Rua Barão de Jaguara", number: "100", complement: "apto 12", neighborhood: "Centro", postalCode: "13015904" },
     });
     const created = await ana.session.call("POST", "/api/contracts", {
       propertyId: apto, contractType: "conventional", startDate: "2026-01-01", endDate: "2026-12-31",
@@ -90,7 +104,7 @@ describe("Contract template and contract PDF API", () => {
     contractId = created.json.id;
     check("(setup) the contract has no PDF yet", created.json?.pdfUrl === null, created.json);
 
-    const before = await prisma.auditLog.count({ where: { action: "generate_pdf" } });
+    const before = await countRows(auditLogs, eq(auditLogs.action, "generate_pdf"));
     const generated = await ana.session.call("POST", `/api/contracts/${contractId}/pdf`);
     check("generate -> 200 with the file name, size and URL", generated.status === 200 && generated.json.contractId === contractId && generated.json.fileName === "contrato-apto-1-joao-b-inquilino-b.pdf" && generated.json.sizeBytes > 1000 && generated.json.url === `/api/contracts/${contractId}/pdf`, generated);
     check("the contract now points to it", (await ana.session.call("GET", `/api/contracts/${contractId}`)).json?.pdfUrl === `/api/contracts/${contractId}/pdf`);
@@ -99,10 +113,10 @@ describe("Contract template and contract PDF API", () => {
     check("download: a real PDF, as an attachment, typed, never cached", file.status === 200 && looksLikePdf(file.bytes) && countPdfPages(file.bytes) >= 1 && file.headers.get("content-type") === "application/pdf" && file.headers.get("content-disposition")?.startsWith("attachment;") === true && file.headers.get("cache-control") === "private, no-store" && file.bytes.length === generated.json.sizeBytes, Object.fromEntries(file.headers));
 
     firstPdfKey = (await keyOfPdf(contractId))!;
-    const record = await prisma.storedFile.findFirstOrThrow({ where: { storageKey: firstPdfKey } });
-    check("recorded as a PDF of the organization, uploaded by the caller, under a generated key", record.mimeType === "application/pdf" && record.organizationId === ana.organizationId && record.uploadedById === ana.userId && /\/[0-9a-f-]{36}\.pdf$/.test(firstPdfKey), record);
+    const [record] = await db.select().from(storedFiles).where(eq(storedFiles.storageKey, firstPdfKey));
+    check("recorded as a PDF of the organization, uploaded by the caller, under a generated key", record?.mimeType === "application/pdf" && record.organizationId === ana.organizationId && record.uploadedById === ana.userId && /\/[0-9a-f-]{36}\.pdf$/.test(firstPdfKey), record);
     check("the bytes are in the storage", (await storage.get(firstPdfKey))?.body.equals(file.bytes) === true);
-    check("generating is audited", (await prisma.auditLog.count({ where: { action: "generate_pdf", entityId: contractId } })) === 1 && (await prisma.auditLog.count({ where: { action: "generate_pdf" } })) === before + 1);
+    check("generating is audited", (await countRows(auditLogs, and(eq(auditLogs.action, "generate_pdf"), eq(auditLogs.entityId, contractId)))) === 1 && (await countRows(auditLogs, eq(auditLogs.action, "generate_pdf"))) === before + 1);
   });
 
   it("regenerates after the property gets an owner", async () => {
@@ -117,8 +131,8 @@ describe("Contract template and contract PDF API", () => {
     const secondKey = (await keyOfPdf(contractId))!;
     check("a new object under a new key", secondKey !== firstPdfKey);
     check("the previous object is gone from the storage", (await storage.get(firstPdfKey)) === null);
-    check("and so is its record", (await prisma.storedFile.count({ where: { storageKey: firstPdfKey } })) === 0);
-    check("exactly one PDF record for the contract", (await prisma.storedFile.count({ where: { contractPdfs: { some: { id: contractId } } } })) === 1);
+    check("and so is its record", (await countRows(storedFiles, eq(storedFiles.storageKey, firstPdfKey))) === 0);
+    check("exactly one PDF record for the contract", (await countRows(storedFiles, inArray(storedFiles.id, db.select({ id: contracts.pdfFileId }).from(contracts).where(eq(contracts.id, contractId))))) === 1);
     check("the new one downloads", looksLikePdf((await ana.session.download(`/api/contracts/${contractId}/pdf`)).bytes));
   });
 
@@ -149,7 +163,7 @@ describe("Contract template and contract PDF API", () => {
   it("falls back to a default after the template is reset", async () => {
     const reset = await ana.session.call("DELETE", "/api/contract-template");
     check("reset -> the default again", reset.status === 200 && reset.json.isDefault === true && reset.json.header.includes("CONTRATO DE LOCAÇÃO"), reset.json);
-    check("the saved row is gone", (await prisma.contractTemplate.count({ where: { organizationId: ana.organizationId } })) === 0);
+    check("the saved row is gone", (await countRows(contractTemplates, eq(contractTemplates.organizationId, ana.organizationId))) === 0);
     check("resetting twice is fine", (await ana.session.call("DELETE", "/api/contract-template")).status === 200);
     check("generating still works with the default", (await ana.session.call("POST", `/api/contracts/${contractId}/pdf`)).status === 200);
   });

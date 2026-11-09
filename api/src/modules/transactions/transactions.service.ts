@@ -33,7 +33,7 @@ function visibleScope(tenant: TenantScope): TransactionScope {
 const toDate = (value: string) => new Date(`${value}T00:00:00.000Z`);
 const toDateOnly = (value: Date) => value.toISOString().slice(0, 10);
 
-/** Service layer: business rules. No HTTP, no Prisma. */
+/** Service layer: business rules. No HTTP, no database. */
 export function createTransactionsService(repository: TransactionsRepository): TransactionsService {
   async function loadOrFail(scope: TransactionScope, id: string): Promise<TransactionRecord> {
     const transaction = await repository.findById(scope, id);

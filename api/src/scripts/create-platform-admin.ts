@@ -14,10 +14,10 @@ if (!email) {
   process.exit(1);
 }
 
-const { prisma, auth } = createContainer(loadEnv(), { withoutDemoData: true });
+const { db, auth, close } = createContainer(loadEnv(), { withoutDemoData: true });
 try {
   const result = await ensurePlatformAdmin(
-    { auth, prisma },
+    { auth, db },
     { email, name: process.env.ADMIN_NAME ?? "Administrador", password: process.env.ADMIN_PASSWORD },
   );
   console.log(
@@ -27,5 +27,5 @@ try {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 } finally {
-  await prisma.$disconnect();
+  close();
 }

@@ -1,11 +1,17 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
+import { and, asc, count, eq } from "drizzle-orm";
+import { auditLogs, feedbacks, transactionCategories, users } from "../../src/db/schema.js";
 import { createAuditRepository } from "../../src/modules/audit/audit.repository.js";
 import { check } from "../helpers/check.js";
-import { type Account, Session, createCast, prisma, resetDatabase, signUp } from "../helpers/world.js";
+import { type Account, Session, close, createCast, db, resetDatabase, signUp } from "../helpers/world.js";
 
 /** Reads the trail straight from the database. */
-const trail = (where: Record<string, unknown> = {}) =>
-  prisma.auditLog.findMany({ where, orderBy: { id: "asc" } });
+const trail = (where: Partial<Record<keyof typeof auditLogs.$inferSelect, string | null>> = {}) =>
+  db
+    .select()
+    .from(auditLogs)
+    .where(and(...Object.entries(where).map(([column, value]) => eq(auditLogs[column as keyof typeof where] as never, value))))
+    .orderBy(asc(auditLogs.id));
 
 /**
  * One scenario told in order: each test builds on the data of the previous ones,
@@ -25,7 +31,7 @@ describe("Audit log", () => {
   beforeAll(async () => {
     await resetDatabase();
   });
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("records sign-ups as logins", async () => {
     const anon = new Session();
@@ -58,7 +64,7 @@ describe("Audit log", () => {
 
     const client = await ana.session.call("POST", "/api/clients", { name: "Maria Oliveira" });
     check("a client is audited", (await trail({ action: "create", entityType: "client", entityId: client.json.id })).length === 1);
-    const tx = await ana.session.call("POST", "/api/transactions", { propertyId, categoryId: (await prisma.transactionCategory.findFirstOrThrow()).id, amountCents: 1000, occurredOn: "2026-05-10" });
+    const tx = await ana.session.call("POST", "/api/transactions", { propertyId, categoryId: (await db.select().from(transactionCategories).limit(1))[0]!.id, amountCents: 1000, occurredOn: "2026-05-10" });
     check("a transaction is audited", (await trail({ action: "create", entityType: "transaction", entityId: tx.json.id })).length === 1);
 
     const contract = await ana.session.call("POST", "/api/contracts", { propertyId, contractType: "conventional", startDate: "2026-01-01", rentTerms: { monthlyRentCents: 300_000, dueDay: 5 }, occupant: { name: "Inquilino" } });
@@ -124,7 +130,7 @@ describe("Audit log", () => {
   });
 
   it("marks what a platform admin did while impersonating", async () => {
-    await prisma.user.update({ where: { email: "ana@example.com" }, data: { role: "admin" } });
+    await db.update(users).set({ role: "admin" }).where(eq(users.email, "ana@example.com"));
     admin = new Session();
     await admin.call("POST", "/api/auth/sign-in/email", { email: "ana@example.com", password: "senha-forte-123" });
 
@@ -155,7 +161,7 @@ describe("Audit log", () => {
     check("the same filters apply", (await admin.call("GET", "/api/admin/audit-logs?action=impersonate_start")).json?.total === 1);
 
     await ana.session.call("POST", "/api/feedback", { message: "Só uma sugestão." });
-    const feedbackId = (await prisma.feedback.findFirstOrThrow()).id;
+    const feedbackId = (await db.select().from(feedbacks).limit(1))[0]!.id;
     await admin.call("PATCH", `/api/admin/feedback/${feedbackId}`, { status: "resolved" });
     const platform = (await trail({ action: "update", entityType: "feedback" }))[0];
     check("an operator action on feedback is a platform-level event", platform?.organizationId === null && platform.entityId === feedbackId, platform);
@@ -164,14 +170,14 @@ describe("Audit log", () => {
   it("keeps the actor snapshot after the user is gone, and applies retention", async () => {
     const dave = await signUp("Dave Costa", "dave@example.com");
     check("(setup) dave signed up", (await trail({ action: "login", actorUserId: dave.userId })).length === 1);
-    await prisma.user.delete({ where: { id: dave.userId } });
+    await db.delete(users).where(eq(users.id, dave.userId));
     const orphan = (await trail({ actorEmail: "dave@example.com" }))[0];
     check("the entry survives, detached from the deleted user, with the name and e-mail", orphan?.actorUserId === null && orphan.actorName === "Dave Costa" && orphan.actorEmail === "dave@example.com", orphan);
 
-    const old = await prisma.auditLog.create({ data: { action: "view", createdAt: new Date(Date.now() - 400 * 86_400_000) } });
-    const repository = createAuditRepository(prisma);
+    const [old] = await db.insert(auditLogs).values({ action: "view", createdAt: new Date(Date.now() - 400 * 86_400_000) }).returning();
+    const repository = createAuditRepository(db);
     const removed = await repository.deleteOlderThan(new Date(Date.now() - 365 * 86_400_000));
-    check("retention removes the entries older than the cut-off", removed === 1 && (await prisma.auditLog.count({ where: { id: old.id } })) === 0, removed);
-    check("and keeps the recent ones", (await prisma.auditLog.count()) > 10);
+    check("retention removes the entries older than the cut-off", removed === 1 && (await db.select({ value: count() }).from(auditLogs).where(eq(auditLogs.id, old!.id)))[0]?.value === 0, removed);
+    check("and keeps the recent ones", ((await db.select({ value: count() }).from(auditLogs))[0]?.value ?? 0) > 10);
   });
 });

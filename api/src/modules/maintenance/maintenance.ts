@@ -1,10 +1,27 @@
-import type { PrismaClient } from "../../lib/prisma.js";
+import { and, count, eq, inArray, lt, notExists, type SQL } from "drizzle-orm";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
+import { atomic } from "../../db/atomic.js";
+import type { Database } from "../../db/database.js";
+import { D1_MAX_PARAMETERS, chunk } from "../../db/helpers.js";
+import {
+  agencies,
+  clients,
+  feedbacks,
+  members,
+  occupants,
+  organizations,
+  properties,
+  sessions,
+  storedFiles,
+  users,
+  verifications,
+} from "../../db/schema.js";
 import type { StorageProvider } from "../../lib/storage/storage.js";
 import { createAuditRepository } from "../audit/audit.repository.js";
 import { sweepOrphanFiles } from "../files/orphan-sweep.js";
 
 export interface MaintenanceDeps {
-  prisma: PrismaClient;
+  db: Database;
   storage: StorageProvider;
   /** The moment the run is made at; injectable for tests. */
   now?: Date;
@@ -32,10 +49,10 @@ const DAY_MS = 86_400_000;
  * cannot be deleted the organization is left for the next run, rather than orphaning it.
  */
 async function deleteDemoOrganization(
-  { prisma, storage }: Pick<MaintenanceDeps, "prisma" | "storage">,
+  { db, storage }: Pick<MaintenanceDeps, "db" | "storage">,
   organizationId: string,
 ): Promise<{ deleted: boolean; ownerIds: string[] }> {
-  const files = await prisma.storedFile.findMany({ where: { organizationId }, select: { storageKey: true } });
+  const files = await db.select({ storageKey: storedFiles.storageKey }).from(storedFiles).where(eq(storedFiles.organizationId, organizationId));
   for (const file of files) {
     try {
       await storage.delete(file.storageKey);
@@ -45,17 +62,27 @@ async function deleteDemoOrganization(
     }
   }
 
-  const members = await prisma.member.findMany({ where: { organizationId }, select: { userId: true } });
-  await prisma.$transaction(async (tx) => {
-    await tx.feedback.deleteMany({ where: { organizationId } }); // points at stored files
-    await tx.property.deleteMany({ where: { organizationId } }); // cascades contracts, reservations, photos, documents, transactions...
-    await tx.storedFile.deleteMany({ where: { organizationId } });
-    await tx.client.deleteMany({ where: { organizationId } });
-    await tx.occupant.deleteMany({ where: { organizationId } });
-    await tx.agency.deleteMany({ where: { organizationId } });
-    await tx.organization.delete({ where: { id: organizationId } }); // cascades members, invitations, template, audit logs
-  });
-  return { deleted: true, ownerIds: members.map((member) => member.userId) };
+  const memberRows = await db.select({ userId: members.userId }).from(members).where(eq(members.organizationId, organizationId));
+  // One batch, in this order: feedback points at stored files; deleting the properties cascades contracts,
+  // reservations, photos, documents and transactions; the organization goes last and cascades members,
+  // invitations, the template and the audit logs.
+  await atomic(db, [
+    db.delete(feedbacks).where(eq(feedbacks.organizationId, organizationId)),
+    db.delete(properties).where(eq(properties.organizationId, organizationId)),
+    db.delete(storedFiles).where(eq(storedFiles.organizationId, organizationId)),
+    db.delete(clients).where(eq(clients.organizationId, organizationId)),
+    db.delete(occupants).where(eq(occupants.organizationId, organizationId)),
+    db.delete(agencies).where(eq(agencies.organizationId, organizationId)),
+    db.delete(organizations).where(eq(organizations.id, organizationId)),
+  ]);
+  return { deleted: true, ownerIds: memberRows.map((member) => member.userId) };
+}
+
+/** DELETE ... WHERE and how many rows it removed (D1 and libSQL report that differently, so it is counted first). */
+async function deleteAndCount(db: Database, table: SQLiteTable, where: SQL): Promise<number> {
+  const [row] = await db.select({ value: count() }).from(table).where(where);
+  await db.delete(table).where(where);
+  return row?.value ?? 0;
 }
 
 /**
@@ -64,7 +91,7 @@ async function deleteDemoOrganization(
  * Safe to run at any time and as often as wanted; every step is independent.
  */
 export async function runMaintenance({
-  prisma,
+  db,
   storage,
   now = new Date(),
   auditRetentionDays = 365,
@@ -80,14 +107,14 @@ export async function runMaintenance({
   };
 
   // 1. Expired demos.
-  const expired = await prisma.organization.findMany({
-    where: { isDemo: true, demoExpiresAt: { lt: now } },
-    select: { id: true },
-  });
+  const expired = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.isDemo, true), lt(organizations.demoExpiresAt, now)));
   const guestIds = new Set<string>();
   for (const { id } of expired) {
     try {
-      const { deleted, ownerIds } = await deleteDemoOrganization({ prisma, storage }, id);
+      const { deleted, ownerIds } = await deleteDemoOrganization({ db, storage }, id);
       if (!deleted) continue;
       report.expiredDemoOrganizations += 1;
       ownerIds.forEach((userId) => guestIds.add(userId));
@@ -97,23 +124,30 @@ export async function runMaintenance({
   }
   if (guestIds.size > 0) {
     // Only guests that have nowhere left to work: a guest who signed up for real is not anonymous any more.
-    const { count } = await prisma.user.deleteMany({
-      where: { id: { in: [...guestIds] }, isAnonymous: true, memberships: { none: {} } },
-    });
-    report.anonymousUsersRemoved = count;
+    for (const ids of chunk([...guestIds], D1_MAX_PARAMETERS - 10)) {
+      report.anonymousUsersRemoved += await deleteAndCount(
+        db,
+        users,
+        and(
+          inArray(users.id, ids),
+          eq(users.isAnonymous, true),
+          notExists(db.select({ one: members.id }).from(members).where(eq(members.userId, users.id))),
+        )!,
+      );
+    }
   }
 
   // 2. Files that nothing points to (includes what deleted properties left behind).
-  report.orphanFilesSwept = await sweepOrphanFiles(prisma, storage, {
+  report.orphanFilesSwept = await sweepOrphanFiles(db, storage, {
     olderThan: new Date(now.getTime() - orphanGraceMinutes * 60_000),
   });
 
   // 3. Audit retention.
-  report.auditEntriesPurged = await createAuditRepository(prisma).deleteOlderThan(new Date(now.getTime() - auditRetentionDays * DAY_MS));
+  report.auditEntriesPurged = await createAuditRepository(db).deleteOlderThan(new Date(now.getTime() - auditRetentionDays * DAY_MS));
 
   // 4. Expired sessions and verification tokens.
-  report.expiredSessionsPurged = (await prisma.session.deleteMany({ where: { expiresAt: { lt: now } } })).count;
-  report.expiredVerificationsPurged = (await prisma.verification.deleteMany({ where: { expiresAt: { lt: now } } })).count;
+  report.expiredSessionsPurged = await deleteAndCount(db, sessions, lt(sessions.expiresAt, now));
+  report.expiredVerificationsPurged = await deleteAndCount(db, verifications, lt(verifications.expiresAt, now));
 
   return report;
 }

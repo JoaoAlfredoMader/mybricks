@@ -178,7 +178,7 @@ function compute(record: PropertyKpiRecord, asOf: string): Computed {
   };
 }
 
-/** Service layer: turns stored data into KPIs. No HTTP, no Prisma. */
+/** Service layer: turns stored data into KPIs. No HTTP, no database. */
 export function createKpisService(repository: KpisRepository): KpisService {
   return {
     async property(tenant, id, { asOf = today() }) {

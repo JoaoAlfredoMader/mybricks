@@ -111,8 +111,6 @@ export interface Page<TItem> {
   total: number;
 }
 
-const decimal = (value: { toNumber(): number } | null) => (value === null ? null : value.toNumber());
-
 function toForSaleDto(record: PropertyRecord): ForSaleDto | null {
   if (record.listingPriceCents === null || record.listingConsentedAt === null) return null;
   const { status, missing } = deriveListingState({
@@ -144,9 +142,9 @@ export function toPropertyDto(record: PropertyRecord): PropertyDto {
       manualRental,
       hasActiveContract: record.contracts.length > 0,
     }),
-    ownershipPercentage: record.ownershipPercentage.toNumber(),
-    totalArea: decimal(record.totalArea),
-    privateArea: decimal(record.privateArea),
+    ownershipPercentage: record.ownershipPercentage,
+    totalArea: record.totalArea,
+    privateArea: record.privateArea,
     bedrooms: record.bedrooms,
     suites: record.suites,
     bathrooms: record.bathrooms,
@@ -156,7 +154,7 @@ export function toPropertyDto(record: PropertyRecord): PropertyDto {
     conservationState: record.conservationState,
     estimatedValueCents: record.estimatedValueCents === null ? null : centsToNumber(record.estimatedValueCents),
     annualExpensesCents: centsToNumber(record.annualExpensesCents),
-    occupancyRate: record.occupancyRate.toNumber(),
+    occupancyRate: record.occupancyRate,
     rentalMode: record.rentalMode,
     notes: record.notes,
     clientId: record.clientId,
@@ -171,8 +169,8 @@ export function toPropertyDto(record: PropertyRecord): PropertyDto {
       number: address.number,
       complement: address.complement,
       neighborhood: address.neighborhood,
-      latitude: decimal(address.latitude),
-      longitude: decimal(address.longitude),
+      latitude: address.latitude,
+      longitude: address.longitude,
     },
     manualRental: manualRental && {
       tenantName: manualRental.tenantName,
@@ -189,7 +187,7 @@ export function toPropertyDto(record: PropertyRecord): PropertyDto {
           lender: record.acquisition.financing.lender,
           financedAmountCents: centsToNumber(record.acquisition.financing.financedAmountCents),
           termMonths: record.acquisition.financing.termMonths,
-          annualInterestRate: record.acquisition.financing.annualInterestRate.toNumber(),
+          annualInterestRate: record.acquisition.financing.annualInterestRate,
           amortizationSystem: record.acquisition.financing.amortizationSystem,
           firstInstallmentOn: record.acquisition.financing.firstInstallmentOn.toISOString().slice(0, 10),
         }

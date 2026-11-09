@@ -1,37 +1,18 @@
-import type { Prisma } from "../../generated/prisma/client.js";
+import { type SQL, and, asc, eq, gte, inArray, isNull, lte, ne, or, sum } from "drizzle-orm";
+import type { Database } from "../../db/database.js";
 import type { ContractStatus, ContractType, RentalMode, TransactionType, UsageType } from "../../db/enums.js";
-import type { PrismaClient } from "../../lib/prisma.js";
+import { chunk } from "../../db/helpers.js";
+import {
+  contractRentTerms,
+  contracts,
+  properties,
+  propertyAcquisitions,
+  propertyManualRentals,
+  reservations,
+  transactionCategories,
+  transactions,
+} from "../../db/schema.js";
 import { transactionPeriodFilter } from "../transactions/transaction-period.js";
-
-const select = {
-  id: true,
-  name: true,
-  clientId: true,
-  usageType: true,
-  rentalMode: true,
-  ownershipPercentage: true,
-  estimatedValueCents: true,
-  annualExpensesCents: true,
-  occupancyRate: true,
-  manualRental: { select: { tenantName: true, monthlyRentCents: true } },
-  acquisition: { select: { acquiredOn: true, costCents: true } },
-  contracts: {
-    where: { status: "active" },
-    select: { contractType: true, rentTerms: { select: { monthlyRentCents: true } } },
-    take: 1,
-  },
-  transactions: {
-    select: {
-      amountCents: true,
-      occurredOn: true,
-      isRecurring: true,
-      recurrenceEndsOn: true,
-      category: { select: { transactionType: true } },
-    },
-  },
-} satisfies Prisma.PropertySelect;
-
-type PropertyRow = Prisma.PropertyGetPayload<{ select: typeof select }>;
 
 /** Everything the KPI calculations need about one property, read in a single go. */
 export interface PropertyKpiRecord {
@@ -101,128 +82,233 @@ export interface KpisRepository {
   loadCashFlow(scope: KpiScope, query: CashFlowQuery): Promise<CashFlowPropertyRecord[]>;
 }
 
-function toRecord(row: PropertyRow, reservationsTotalCents: bigint): PropertyKpiRecord {
-  const [contract] = row.contracts;
-  return {
-    id: row.id,
-    name: row.name,
-    clientId: row.clientId,
-    usageType: row.usageType,
-    rentalMode: row.rentalMode,
-    ownershipPercentage: row.ownershipPercentage.toNumber(),
-    estimatedValueCents: row.estimatedValueCents,
-    annualExpensesCents: row.annualExpensesCents,
-    occupancyRate: row.occupancyRate.toNumber(),
-    manualRental: row.manualRental,
-    acquisition: row.acquisition,
-    activeContract: contract
-      ? { contractType: contract.contractType, monthlyRentCents: contract.rentTerms?.monthlyRentCents ?? null }
-      : null,
-    reservationsTotalCents,
-    transactions: row.transactions.map(({ category, ...transaction }) => ({
-      ...transaction,
-      transactionType: category.transactionType,
-    })),
-  };
+/** Property ids go into IN (...) lists in chunks, so a statement never binds more than D1 allows (100 parameters). */
+const ID_CHUNK = 80;
+
+/** The properties the scope reaches. */
+function propertyFilter(scope: KpiScope, extra: Array<SQL | undefined>): SQL {
+  return and(
+    eq(properties.organizationId, scope.organizationId),
+    scope.createdById ? eq(properties.createdById, scope.createdById) : undefined,
+    ...extra,
+  )!;
 }
 
-const cashFlowSelect = ({ from, to }: Pick<CashFlowQuery, "from" | "to">) =>
-  ({
-    id: true,
-    usageType: true,
-    rentalMode: true,
-    ownershipPercentage: true,
-    annualExpensesCents: true,
-    occupancyRate: true,
-    manualRental: { select: { monthlyRentCents: true } },
-    contracts: {
-      where: {
-        contractType: "conventional",
-        status: { not: "cancelled" },
-        startDate: { lte: to },
-        OR: [{ endDate: null }, { endDate: { gte: from } }],
-      },
-      select: { status: true, startDate: true, endDate: true, updatedAt: true, rentTerms: { select: { monthlyRentCents: true } } },
-    },
-    reservations: {
-      where: { status: "confirmed", checkIn: { gte: from, lte: to } },
-      select: { checkIn: true, totalAmountCents: true },
-    },
-    transactions: {
-      where: transactionPeriodFilter(from, to),
-      select: {
-        amountCents: true,
-        occurredOn: true,
-        isRecurring: true,
-        recurrenceEndsOn: true,
-        category: { select: { transactionType: true } },
-      },
-    },
-  }) satisfies Prisma.PropertySelect;
-
-type CashFlowRow = Prisma.PropertyGetPayload<{ select: ReturnType<typeof cashFlowSelect> }>;
-
-function toCashFlowRecord(row: CashFlowRow): CashFlowPropertyRecord {
-  return {
-    id: row.id,
-    usageType: row.usageType,
-    rentalMode: row.rentalMode,
-    ownershipPercentage: row.ownershipPercentage.toNumber(),
-    annualExpensesCents: row.annualExpensesCents,
-    occupancyRate: row.occupancyRate.toNumber(),
-    manualMonthlyRentCents: row.manualRental?.monthlyRentCents ?? null,
-    contracts: row.contracts.flatMap(({ rentTerms, ...contract }) =>
-      rentTerms ? [{ ...contract, monthlyRentCents: rentTerms.monthlyRentCents }] : [],
-    ),
-    reservations: row.reservations,
-    transactions: row.transactions.map(({ category, ...transaction }) => ({
-      ...transaction,
-      transactionType: category.transactionType,
-    })),
-  };
+/** Runs `load` for each chunk of ids and groups the rows by the property they belong to. */
+async function loadByProperty<T extends { propertyId: string }>(
+  ids: readonly string[],
+  load: (ids: string[]) => Promise<T[]>,
+): Promise<Map<string, T[]>> {
+  const rows = (await Promise.all(chunk(ids, ID_CHUNK).map(load))).flat();
+  const grouped = new Map<string, T[]>();
+  for (const row of rows) {
+    const list = grouped.get(row.propertyId);
+    if (list) list.push(row);
+    else grouped.set(row.propertyId, [row]);
+  }
+  return grouped;
 }
 
-/** Repository layer: the only place that talks to Prisma. */
-export function createKpisRepository(prisma: PrismaClient): KpisRepository {
+const transactionColumns = {
+  propertyId: transactions.propertyId,
+  amountCents: transactions.amountCents,
+  occurredOn: transactions.occurredOn,
+  isRecurring: transactions.isRecurring,
+  recurrenceEndsOn: transactions.recurrenceEndsOn,
+  transactionType: transactionCategories.transactionType,
+};
+
+function toTransaction({
+  propertyId: _propertyId,
+  ...transaction
+}: { propertyId: string } & PropertyKpiRecord["transactions"][number]): PropertyKpiRecord["transactions"][number] {
+  return transaction;
+}
+
+/** Repository layer: the only place that talks to the database. */
+export function createKpisRepository(db: Database): KpisRepository {
   return {
     async loadProperties(scope, { propertyId, clientId, reservationsFrom, reservationsTo }) {
-      const rows = await prisma.property.findMany({
-        where: {
-          organizationId: scope.organizationId,
-          ...(scope.createdById ? { createdById: scope.createdById } : {}),
-          ...(propertyId ? { id: propertyId } : {}),
-          ...(clientId ? { clientId } : {}),
-        },
-        select,
-        orderBy: [{ name: "asc" }, { id: "asc" }],
-      });
+      const rows = await db
+        .select({
+          id: properties.id,
+          name: properties.name,
+          clientId: properties.clientId,
+          usageType: properties.usageType,
+          rentalMode: properties.rentalMode,
+          ownershipPercentage: properties.ownershipPercentage,
+          estimatedValueCents: properties.estimatedValueCents,
+          annualExpensesCents: properties.annualExpensesCents,
+          occupancyRate: properties.occupancyRate,
+        })
+        .from(properties)
+        .where(
+          propertyFilter(scope, [
+            propertyId ? eq(properties.id, propertyId) : undefined,
+            clientId ? eq(properties.clientId, clientId) : undefined,
+          ]),
+        )
+        .orderBy(asc(properties.name), asc(properties.id));
       if (rows.length === 0) return [];
 
-      const booked = await prisma.reservation.groupBy({
-        by: ["propertyId"],
-        where: {
-          propertyId: { in: rows.map((row) => row.id) },
-          status: "confirmed",
-          checkIn: { gte: reservationsFrom, lte: reservationsTo },
-        },
-        _sum: { totalAmountCents: true },
-      });
-      const totals = new Map(booked.map((entry) => [entry.propertyId, entry._sum.totalAmountCents ?? 0n]));
+      const ids = rows.map((row) => row.id);
+      const [manualRentals, acquisitions, activeContracts, transactionRows, booked] = await Promise.all([
+        loadByProperty(ids, (chunkIds) =>
+          db
+            .select({
+              propertyId: propertyManualRentals.propertyId,
+              tenantName: propertyManualRentals.tenantName,
+              monthlyRentCents: propertyManualRentals.monthlyRentCents,
+            })
+            .from(propertyManualRentals)
+            .where(inArray(propertyManualRentals.propertyId, chunkIds)),
+        ),
+        loadByProperty(ids, (chunkIds) =>
+          db
+            .select({
+              propertyId: propertyAcquisitions.propertyId,
+              acquiredOn: propertyAcquisitions.acquiredOn,
+              costCents: propertyAcquisitions.costCents,
+            })
+            .from(propertyAcquisitions)
+            .where(inArray(propertyAcquisitions.propertyId, chunkIds)),
+        ),
+        // At most one active contract per property (partial unique index), with or without rent terms.
+        loadByProperty(ids, (chunkIds) =>
+          db
+            .select({
+              propertyId: contracts.propertyId,
+              contractType: contracts.contractType,
+              monthlyRentCents: contractRentTerms.monthlyRentCents,
+            })
+            .from(contracts)
+            .leftJoin(contractRentTerms, eq(contractRentTerms.contractId, contracts.id))
+            .where(and(inArray(contracts.propertyId, chunkIds), eq(contracts.status, "active"))),
+        ),
+        loadByProperty(ids, (chunkIds) =>
+          db
+            .select(transactionColumns)
+            .from(transactions)
+            .innerJoin(transactionCategories, eq(transactionCategories.id, transactions.categoryId))
+            .where(inArray(transactions.propertyId, chunkIds)),
+        ),
+        Promise.all(
+          chunk(ids, ID_CHUNK).map((chunkIds) =>
+            db
+              .select({ propertyId: reservations.propertyId, total: sum(reservations.totalAmountCents) })
+              .from(reservations)
+              .where(
+                and(
+                  inArray(reservations.propertyId, chunkIds),
+                  eq(reservations.status, "confirmed"),
+                  gte(reservations.checkIn, reservationsFrom),
+                  lte(reservations.checkIn, reservationsTo),
+                ),
+              )
+              .groupBy(reservations.propertyId),
+          ),
+        ),
+      ]);
+      const totals = new Map(booked.flat().map((entry) => [entry.propertyId, BigInt(entry.total ?? 0)]));
 
-      return rows.map((row) => toRecord(row, totals.get(row.id) ?? 0n));
+      return rows.map((row): PropertyKpiRecord => {
+        const manualRental = manualRentals.get(row.id)?.[0];
+        const acquisition = acquisitions.get(row.id)?.[0];
+        const contract = activeContracts.get(row.id)?.[0];
+        return {
+          ...row,
+          manualRental: manualRental
+            ? { tenantName: manualRental.tenantName, monthlyRentCents: manualRental.monthlyRentCents }
+            : null,
+          acquisition: acquisition ? { acquiredOn: acquisition.acquiredOn, costCents: acquisition.costCents } : null,
+          activeContract: contract ? { contractType: contract.contractType, monthlyRentCents: contract.monthlyRentCents } : null,
+          reservationsTotalCents: totals.get(row.id) ?? 0n,
+          transactions: (transactionRows.get(row.id) ?? []).map(toTransaction),
+        };
+      });
     },
 
     async loadCashFlow(scope, { propertyId, from, to }) {
-      const rows = await prisma.property.findMany({
-        where: {
-          organizationId: scope.organizationId,
-          ...(scope.createdById ? { createdById: scope.createdById } : {}),
-          ...(propertyId ? { id: propertyId } : {}),
-        },
-        select: cashFlowSelect({ from, to }),
-        orderBy: [{ name: "asc" }, { id: "asc" }],
-      });
-      return rows.map(toCashFlowRecord);
+      const rows = await db
+        .select({
+          id: properties.id,
+          usageType: properties.usageType,
+          rentalMode: properties.rentalMode,
+          ownershipPercentage: properties.ownershipPercentage,
+          annualExpensesCents: properties.annualExpensesCents,
+          occupancyRate: properties.occupancyRate,
+        })
+        .from(properties)
+        .where(propertyFilter(scope, [propertyId ? eq(properties.id, propertyId) : undefined]))
+        .orderBy(asc(properties.name), asc(properties.id));
+      if (rows.length === 0) return [];
+
+      const ids = rows.map((row) => row.id);
+      const [manualRentals, contractRows, reservationRows, transactionRows] = await Promise.all([
+        loadByProperty(ids, (chunkIds) =>
+          db
+            .select({ propertyId: propertyManualRentals.propertyId, monthlyRentCents: propertyManualRentals.monthlyRentCents })
+            .from(propertyManualRentals)
+            .where(inArray(propertyManualRentals.propertyId, chunkIds)),
+        ),
+        loadByProperty(ids, (chunkIds) =>
+          db
+            .select({
+              propertyId: contracts.propertyId,
+              status: contracts.status,
+              startDate: contracts.startDate,
+              endDate: contracts.endDate,
+              updatedAt: contracts.updatedAt,
+              monthlyRentCents: contractRentTerms.monthlyRentCents,
+            })
+            .from(contracts)
+            // A contract without rent terms has nothing to count: the inner join leaves it out.
+            .innerJoin(contractRentTerms, eq(contractRentTerms.contractId, contracts.id))
+            .where(
+              and(
+                inArray(contracts.propertyId, chunkIds),
+                eq(contracts.contractType, "conventional"),
+                ne(contracts.status, "cancelled"),
+                lte(contracts.startDate, to),
+                or(isNull(contracts.endDate), gte(contracts.endDate, from)),
+              ),
+            ),
+        ),
+        loadByProperty(ids, (chunkIds) =>
+          db
+            .select({
+              propertyId: reservations.propertyId,
+              checkIn: reservations.checkIn,
+              totalAmountCents: reservations.totalAmountCents,
+            })
+            .from(reservations)
+            .where(
+              and(
+                inArray(reservations.propertyId, chunkIds),
+                eq(reservations.status, "confirmed"),
+                gte(reservations.checkIn, from),
+                lte(reservations.checkIn, to),
+              ),
+            ),
+        ),
+        loadByProperty(ids, (chunkIds) =>
+          db
+            .select(transactionColumns)
+            .from(transactions)
+            .innerJoin(transactionCategories, eq(transactionCategories.id, transactions.categoryId))
+            .where(and(inArray(transactions.propertyId, chunkIds), transactionPeriodFilter(from, to))),
+        ),
+      ]);
+
+      return rows.map(
+        (row): CashFlowPropertyRecord => ({
+          ...row,
+          manualMonthlyRentCents: manualRentals.get(row.id)?.[0]?.monthlyRentCents ?? null,
+          contracts: (contractRows.get(row.id) ?? []).map(({ propertyId: _propertyId, ...contract }) => contract),
+          reservations: (reservationRows.get(row.id) ?? []).map(({ propertyId: _propertyId, ...reservation }) => reservation),
+          transactions: (transactionRows.get(row.id) ?? []).map(toTransaction),
+        }),
+      );
     },
   };
 }

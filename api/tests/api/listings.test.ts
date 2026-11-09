@@ -1,9 +1,11 @@
+import { asc, count, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { ensurePlatformAdmin } from "../../src/modules/auth/platform-admin.js";
 import { check } from "../helpers/check.js";
 import { JPEG, MIME, PNG } from "../helpers/fixtures.js";
 import { createContainer } from "../../src/container.js";
-import { type Account, Session, auth, env, createCast, prisma, resetDatabase } from "../helpers/world.js";
+import { cities, organizations, properties, propertySubtypes, auditLogs } from "../../src/db/schema.js";
+import { type Account, Session, auth, close, createCast, db, env, resetDatabase } from "../helpers/world.js";
 
 const UNKNOWN = "00000000-0000-4000-8000-000000000000";
 const PRICE = 500_000_00;
@@ -72,12 +74,19 @@ describe("Public listings", () => {
 
   const sell = (who: Account, id: string, forSale: unknown) => who.session.call("PATCH", `/api/properties/${id}`, { forSale });
   const view = async (who: Account, id: string) => (await who.session.call("GET", `/api/properties/${id}`)).json;
-  const row = (id: string) => prisma.property.findUniqueOrThrow({ where: { id }, select: { listingPriceCents: true, listingConsentedAt: true, listingHiddenAt: true } });
+  const row = async (id: string) => {
+    const [found] = await db
+      .select({ listingPriceCents: properties.listingPriceCents, listingConsentedAt: properties.listingConsentedAt, listingHiddenAt: properties.listingHiddenAt })
+      .from(properties)
+      .where(eq(properties.id, id));
+    if (!found) throw new Error(`property ${id} not found`);
+    return found;
+  };
 
   beforeAll(async () => {
     await resetDatabase();
   });
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("is readable without a session, and empty at first", async () => {
     const response = await new Session().call("GET", "/api/listings");
@@ -93,10 +102,10 @@ describe("Public listings", () => {
     check("limit 24 is accepted", (await listings("?limit=24")).status === 200);
 
     ({ ana, bia, carlos } = await createCast());
-    await ensurePlatformAdmin({ auth, prisma }, { email: "operador@example.com", name: "Operador", password: "senha-do-operador-1" });
+    await ensurePlatformAdmin({ auth, db }, { email: "operador@example.com", name: "Operador", password: "senha-do-operador-1" });
     operator = new Session();
     await operator.call("POST", "/api/auth/sign-in/email", { email: "operador@example.com", password: "senha-do-operador-1" });
-    cityId = (await prisma.city.findFirstOrThrow({ orderBy: { ibgeCode: "asc" } })).ibgeCode;
+    cityId = (await db.select({ ibgeCode: cities.ibgeCode }).from(cities).orderBy(asc(cities.ibgeCode)).limit(1))[0]!.ibgeCode;
   });
 
   it("asks for the consent and a real price before a property goes up for sale", async () => {
@@ -113,7 +122,7 @@ describe("Public listings", () => {
     check("an empty forSale -> 422", (await create({})).status === 422);
     check("a price that is not an integer is malformed input -> 400", (await create({ priceCents: 10.5, consent: true })).status === 400);
     check("a price that is text -> 400", (await create({ priceCents: "caro", consent: true })).status === 400);
-    check("nothing was created by those attempts", (await prisma.property.count({ where: { name: "Apto de teste" } })) === 0);
+    check("nothing was created by those attempts", (await db.select({ value: count() }).from(properties).where(eq(properties.name, "Apto de teste")))[0]!.value === 0);
 
     const created = await create({ priceCents: PRICE, consent: true });
     check("with both, it is created for sale", created.status === 201 && created.json?.forSale?.priceCents === PRICE, created.json?.forSale);
@@ -132,7 +141,7 @@ describe("Public listings", () => {
   it("goes live only when complete: it can be marked for sale before the photos", async () => {
     const draft = await make(ana, "Nome-Interno do Apto", {
       notes: "NOTA-SECRETA do apto",
-      subtypeId: (await prisma.propertySubtype.findFirstOrThrow({ where: { propertyType: "residential" } })).id,
+      subtypeId: (await db.select({ id: propertySubtypes.id }).from(propertySubtypes).where(eq(propertySubtypes.propertyType, "residential")).limit(1))[0]!.id,
       estimatedValueCents: 123_456_78,
     });
     apto = draft.id;
@@ -268,7 +277,7 @@ describe("Public listings", () => {
     const signIn = await guest.call("POST", "/api/auth/sign-in/anonymous");
     check("(setup) a guest signs in", signIn.status === 200, signIn);
     const me = await guest.call("GET", "/api/me");
-    const organization = await prisma.organization.findUniqueOrThrow({ where: { id: me.json.organizationId } });
+    const organization = (await db.select().from(organizations).where(eq(organizations.id, me.json.organizationId)))[0]!;
     check("(setup) the guest works in a demo organization", organization.isDemo === true);
 
     const created = await guest.call("POST", "/api/properties", {
@@ -397,12 +406,12 @@ describe("Public listings", () => {
       check("the platform's number comes from LISTINGS_WHATSAPP_NUMBER", response.json?.whatsappNumber === "5511987654321", response.json?.whatsappNumber);
       check("and it is the same list", response.json?.items?.length === (await live()).length);
     } finally {
-      await configured.prisma.$disconnect();
+      await configured.close();
     }
   });
 
   it("leaves a trace of turning a listing on or off, and of moderation", async () => {
-    const trail = (entityId: string) => prisma.auditLog.findMany({ where: { entityId }, orderBy: { id: "asc" } });
+    const trail = (entityId: string) => db.select().from(auditLogs).where(eq(auditLogs.entityId, entityId)).orderBy(asc(auditLogs.id));
     const listingEvents = async (entityId: string) =>
       (await trail(entityId))
         .map((entry) => ({ entry, details: JSON.parse(entry.details ?? "{}") as Record<string, unknown> }))

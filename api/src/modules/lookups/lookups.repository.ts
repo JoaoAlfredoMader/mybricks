@@ -1,6 +1,8 @@
-import { Prisma } from "../../generated/prisma/client.js";
+import { and, asc, eq, sql } from "drizzle-orm";
+import type { Database } from "../../db/database.js";
 import type { PropertyType, TransactionType, UsageType } from "../../db/enums.js";
-import type { PrismaClient } from "../../lib/prisma.js";
+import { containsSensitive, searchKey } from "../../db/helpers.js";
+import { cities, propertySubtypes, propertyTypeUsages, transactionCategories } from "../../db/schema.js";
 
 export interface CityRecord {
   ibgeCode: number;
@@ -32,36 +34,31 @@ export interface LookupsRepository {
   listPropertyTypeUsages(): Promise<PropertyTypeUsageRecord[]>;
 }
 
-/** Keeps `%`, `_` and `\` typed by the user from acting as LIKE wildcards. */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
-
 /** Repository layer: reference data shared by every organization (no tenant filter). */
-export function createLookupsRepository(prisma: PrismaClient): LookupsRepository {
+export function createLookupsRepository(db: Database): LookupsRepository {
   return {
     searchCities({ search, state, limit }) {
-      // Raw query for unaccent(): users type "sao paulo" and expect "São Paulo".
-      const pattern = `%${escapeLike(search)}%`;
-      const stateFilter = state ? Prisma.sql`AND state = ${state}` : Prisma.empty;
-      return prisma.$queryRaw<CityRecord[]>`
-        SELECT ibge_code AS "ibgeCode", name, state
-        FROM cities
-        WHERE unaccent(name) ILIKE unaccent(${pattern}) ${stateFilter}
-        ORDER BY name, state
-        LIMIT ${limit}`;
+      // SQLite has no unaccent(): `name_search` holds the name in lower case without accents, and the term
+      // gets the same treatment, so "sao paulo" finds "São Paulo". `%`, `_` and `\` are matched literally.
+      return db
+        .select({ ibgeCode: cities.ibgeCode, name: cities.name, state: cities.state })
+        .from(cities)
+        .where(and(containsSensitive(cities.nameSearch, searchKey(search)), state ? eq(cities.state, state) : undefined))
+        .orderBy(asc(cities.nameSearch), asc(cities.name), asc(cities.state))
+        .limit(limit);
     },
 
     listTransactionCategories() {
-      return prisma.transactionCategory.findMany({ orderBy: [{ transactionType: "asc" }, { name: "asc" }] });
+      return db.select().from(transactionCategories)// Revenue first, as the enum was declared (alphabetically "expense" would come first).
+        .orderBy(sql`CASE ${transactionCategories.transactionType} WHEN 'revenue' THEN 0 ELSE 1 END`, asc(transactionCategories.name));
     },
 
     listPropertySubtypes() {
-      return prisma.propertySubtype.findMany({ orderBy: [{ propertyType: "asc" }, { name: "asc" }] });
+      return db.select().from(propertySubtypes).orderBy(asc(propertySubtypes.propertyType), asc(propertySubtypes.name));
     },
 
     listPropertyTypeUsages() {
-      return prisma.propertyTypeUsage.findMany();
+      return db.select().from(propertyTypeUsages);
     },
   };
 }

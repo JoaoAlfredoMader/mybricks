@@ -363,7 +363,7 @@ export function createPropertiesService(repository: PropertiesRepository): Prope
       const terms: FinancingTerms = {
         financedAmountCents: centsToNumber(financing.financedAmountCents),
         termMonths: financing.termMonths,
-        annualInterestRate: financing.annualInterestRate.toNumber(),
+        annualInterestRate: financing.annualInterestRate,
         amortizationSystem: financing.amortizationSystem,
         firstInstallmentOn: financing.firstInstallmentOn.toISOString().slice(0, 10),
       };
