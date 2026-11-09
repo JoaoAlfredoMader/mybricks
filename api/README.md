@@ -6,10 +6,10 @@ Back-end of **MyBricks**, a real-estate portfolio management platform: propertie
 
 ## Stack
 
-- **Hono** on Node.js (TypeScript, ESM)
-- **Prisma 7** + **PostgreSQL 17**
-- **Better Auth** (organization, admin and anonymous plugins), wired in a later step
-- **Docker Compose** for local services
+- **Hono** (TypeScript, ESM). Runs on Node for development and as a **Cloudflare Worker** in production
+- **Drizzle ORM** on **SQLite**: a local file on Node, **Cloudflare D1** on the Worker (same schema, same migrations)
+- **Better Auth** (organization, admin and anonymous plugins)
+- **Cloudflare R2** for photos, documents and contract PDFs (S3-compatible drivers for Node), **Resend** for e-mail
 - **Zod** for validation
 
 ## Architecture
@@ -25,14 +25,17 @@ route  →  controller  →  service  →  repository
 | Route | HTTP binding: path, input validation, serialization |
 | Controller | Receives validated input (never the Hono `Context`), calls the service, maps the result to status + DTO |
 | Service | Business rules and calculations |
-| Repository | The only layer that talks to Prisma |
+| Repository | The only layer that talks to the database (Drizzle) |
 
 ```
 src/
 ├── app.ts                 # Hono app factory (routes, error handling)
-├── server.ts              # process entry point
+├── server.ts              # Node entry point
+├── worker.ts              # Cloudflare Worker entry point (fetch + cron)
+├── composition.ts         # wires every dependency; container.ts (Node) and worker.ts bring the runtime pieces
 ├── config/env.ts          # validated environment
-├── lib/prisma.ts          # Prisma client with the pg driver adapter
+├── db/                    # Drizzle schema, enums, column types, helpers, clients (libSQL on Node, D1 on a Worker)
+├── lib/                   # mail (Resend, log) and storage (local, S3, R2) drivers
 ├── shared/errors/         # typed domain errors
 └── modules/<feature>/     # route, controller, service, repository
 ```
@@ -42,11 +45,18 @@ src/
 ```bash
 cp .env.example .env   # then set BETTER_AUTH_SECRET (openssl rand -base64 48)
 npm install
-npm run db:up          # PostgreSQL on localhost:5433
-npm run db:generate    # Prisma client -> src/generated/prisma
-npm run db:migrate     # apply migrations
-npm run db:seed        # reference data (idempotent)
+npm run db:migrate     # creates .data/mybricks.db with the schema and the reference data
 npm run dev            # http://localhost:3000/health
+```
+
+No database server is needed: development uses a SQLite file.
+
+### Running as a Worker locally
+
+```bash
+cp .dev.vars.example .dev.vars
+npm run db:migrate:worker   # applies the migrations to a local D1 (kept in .wrangler/)
+npm run dev:worker          # http://localhost:8787, the same runtime as production (workerd), with local D1 and R2
 ```
 
 ## API reference (OpenAPI)
@@ -218,7 +228,7 @@ The owner can mark a property as for sale (`forSale: { priceCents, consent: true
 
 - **A guest gets a workspace worth exploring.** Signing in as a guest creates a demo organization that expires after `DEMO_TTL_HOURS` and fills it with a made-up portfolio built around *today*: 9 properties (apartments, a short-stay flat, a commercial room, a logistics warehouse, a plot, a beach house, a parking spot, a vacant apartment), 3 clients, an agency, 4 contracts (one ended, one about to end), 8 reservations (one coming up, one cancelled), expenses and a revenue, proposals, a financing with its schedule and an irregular registry. The indicators come out plausible (portfolio cap rate in the single digits, IRR where there is an acquisition). The guest can change everything, generate a contract PDF and upload files on top of it. If the sample cannot be written (for instance the reference data was never seeded) the guest still gets a working, empty workspace. If the guest signs up for real, the workspace is kept with all its data.
 - **Housekeeping.** `npm run maintenance` runs it once (cron-friendly); the server also runs it at start and every `MAINTENANCE_INTERVAL_MINUTES` (default 60, `0` turns it off), never overlapping with itself. Each run:
-  1. deletes **expired demo organizations** with everything in them. The objects in the storage go first, then the rows in the order Postgres needs (feedback, properties and what hangs from them, stored files, clients, occupants, agencies, the organization). If an object cannot be deleted the organization is kept and retried on the next run, instead of orphaning the file. The guest accounts that owned them are removed too, unless the guest still belongs to another organization;
+  1. deletes **expired demo organizations** with everything in them. The objects in the storage go first, then the rows in the order the foreign keys need (feedback, properties and what hangs from them, stored files, clients, occupants, agencies, the organization). If an object cannot be deleted the organization is kept and retried on the next run, instead of orphaning the file. The guest accounts that owned them are removed too, unless the guest still belongs to another organization;
   2. sweeps **orphan files** older than an hour;
   3. purges **audit entries** older than 12 months;
   4. purges **expired sessions and verification tokens**.
@@ -284,7 +294,7 @@ The owner panel. It needs the `admin` platform role (`users.role`, set in the da
 
 ### Uploads and storage
 
-- **Drivers.** `STORAGE_DRIVER=local` keeps files in `STORAGE_DIR` (development); `s3` talks to any S3-compatible bucket (R2, B2, MinIO, AWS) with `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION` and `S3_FORCE_PATH_STYLE`. Switching is configuration only; the S3 driver is covered with a fake client, not against a live bucket.
+- **Drivers.** `STORAGE_DRIVER=local` keeps files in `STORAGE_DIR` (development); `s3` talks to any S3-compatible bucket (R2, B2, MinIO, AWS) with `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION` and `S3_FORCE_PATH_STYLE`. Switching is configuration only; the S3 driver is covered with a fake client, not against a live bucket. On a Worker the driver is the **R2 binding** `FILES` (no keys, no endpoint): `worker.ts` builds it, the environment variables above do not apply.
 - **The database keeps the metadata, the storage keeps the bytes.** A file's key is generated (`<organization>/<uuid>.<ext>`): the name sent by the client never reaches the storage and is reduced to its last path segment.
 - **Checks.** The declared type must be allowed **and the bytes must start with that type's signature** (a script renamed `.png` is refused with `415`), empty files are `400`, and anything over `MAX_UPLOAD_MB` (default 15) is `413`, enforced on the request body too. Served files carry `X-Content-Type-Options: nosniff`.
 - **Order of writes.** The object is stored first; if the database then refuses, the object is taken back. On delete the rows go first and the object after; if the storage is unreachable the leftover is picked up by the sweep.
@@ -341,20 +351,22 @@ The model is normalized (3NF) and documented in [`docs/database/mybricks-databas
 - **Authorship** references `members(organization_id, user_id)`: the author must belong to the same organization.
 - **Money** is stored as integer cents (`BigInt`). Convert in the DTO layer: `JSON.stringify` cannot serialize `BigInt`.
 - **Derived values are never stored** (property status, IRR, cap rate, NOI, yield, financing installment and balance).
-- **Rules Prisma cannot express** (one active contract per property, no overlapping confirmed reservations, `CHECK` constraints, case-insensitive unique e-mail) live in the hand-written migration `prisma/migrations/*_manual_constraints` (the listing `CHECK` and the partial index of the public listings live in `*_property_listings`). Prisma does not treat them as drift.
-- **Reference data** (cities, subtypes, allowed usages, transaction categories) is seeded and idempotent. Display names are pt-BR; codes (enum values) stay in English.
-- **Deleting an organization** must delete in order inside one transaction (properties, stored files, clients, occupants, agencies, organization). Postgres checks each cascade step separately, so a plain `DELETE` of the organization fails by design.
+- **Rules in the database.** `CHECK` constraints, the partial unique index (one active contract per property), the case-insensitive unique e-mail and the partial index of the public listings are declared in `src/db/schema.ts`. SQLite has no `EXCLUDE`, so "no overlapping confirmed reservations" is a trigger (`migrations/0001_reservation_overlap.sql`) that refuses the write; the repository turns it into a 409.
+- **Reference data** (cities, subtypes, allowed usages, transaction categories) is a migration (`migrations/0002_reference_data.sql`, generated by `npm run db:reference-data`), so every database gets it with its tables. Display names are pt-BR; codes (enum values) stay in English.
+- **Deleting an organization** deletes in order inside one batch (feedback, properties, stored files, clients, occupants, agencies, organization). The composite foreign keys are `NO ACTION`, so a plain `DELETE` of the organization fails by design.
+- **No interactive transactions.** D1 offers only batches (`db.batch`): a list of statements known up front that runs all-or-nothing. Multi-step writes are built that way (`src/db/atomic.ts`), ids are generated by the application so a later statement can refer to an earlier row, and rules that depend on current data are enforced by the database itself (unique index, trigger, `CHECK`). D1 also allows 100 bound parameters per statement, so long lists and multi-row inserts are chunked.
+- **Search** is case-insensitive for ASCII only (SQLite `LIKE`); the city search compares against `cities.name_search` (lower case, no accents).
 
 ## Tests
 
-[Vitest](https://vitest.dev), with PostgreSQL running (`npm run db:up`).
+[Vitest](https://vitest.dev). Nothing else has to be running.
 
 ```bash
 npm test            # whole suite
 npm run test:watch  # re-run on change
 ```
 
-- **Isolated database.** Tests run against `<database>_test` on the same server (created, migrated and seeded automatically before the run), never against the development database. The helpers refuse to truncate anything whose name does not end in `_test`.
+- **Isolated database.** Each run creates its own SQLite file in the temp folder, applies every migration and removes it at the end, so it never touches the development database (and two runs can go side by side). The reset helper refuses to wipe anything that is not such a file.
 - **`tests/unit`**: pure logic with no database (the KPI calculations and the monthly cash flow).
 - **`tests/api`**: the real app wired against the test database and called in-process, one file per module. Each file tells one scenario in order (sign-ups, then creation, validation, listing, editing, visibility of members, isolation between organizations, deletion), so run a file as a whole rather than a single test. Checks inside a test are soft: a run reports every broken expectation, each with its name and the response that broke it.
 - Better Auth skips its own origin check when `NODE_ENV=test`, so only the app-level CORS is covered.
@@ -370,12 +382,14 @@ npm run test:watch  # re-run on change
 | `npm run admin:create` | create or promote the platform operator (`ADMIN_EMAIL`, `ADMIN_PASSWORD`) |
 | `npm run openapi:export` | regenerate `docs/openapi.json` |
 | `npm run maintenance` | one housekeeping run (expired demos, orphan files, audit retention, stale sessions) |
-| `npm run db:up` / `db:down` | start / stop local PostgreSQL |
-| `npm run db:migrate` | create/apply migrations (dev) |
-| `npm run db:seed` | seed reference data: 5,571 IBGE municipalities, property subtypes, allowed usages per property type, transaction categories |
-| `npm run db:seed:fetch-cities` | regenerate `prisma/seed/data/cities.json` from the IBGE API |
-| `npm run db:deploy` | apply migrations (production) |
-| `npm run db:studio` | Prisma Studio |
+| `npm run db:generate` | after editing `src/db/schema.ts`: write the next SQL migration to `migrations/` |
+| `npm run db:migrate` | apply the migrations to the local SQLite file |
+| `npm run db:migrate:worker` | apply them to the local D1 used by `dev:worker` |
+| `npm run db:deploy` | apply them to the real D1 (`wrangler d1 migrations apply DB --remote`) |
+| `npm run db:reference-data` | regenerate the reference-data migration (5,571 IBGE municipalities, subtypes, usage rules, categories) |
+| `npm run db:fetch-cities` | refresh `src/db/reference-data/cities.json` from the IBGE API |
+| `npm run db:studio` | Drizzle Studio |
+| `npm run dev:worker` / `npm run deploy` | run the Worker locally / deploy it with wrangler |
 
 ## Conventions
 
