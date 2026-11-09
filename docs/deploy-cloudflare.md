@@ -2,6 +2,8 @@
 
 Estado em 2026-11-09. Domínio: `mybricks.com.br`. E-mail: Resend. Monorepo: `app/` (front) e `api/` (back).
 
+**Os comandos, na ordem, estão em [deploy-passo-a-passo.md](deploy-passo-a-passo.md).** Este documento explica as escolhas.
+
 ## 1. Arquitetura proposta
 
 Um único domínio, dois Workers, mesma origem (sem CORS, cookie de sessão funciona como em desenvolvimento, onde o Vite faz proxy de `/api`):
@@ -35,7 +37,9 @@ Já existe e foi testado no runtime real da Cloudflare, localmente (`npm run dev
 - Cadastro, convidado com carteira de exemplo, listagens, KPIs, busca de cidades, geração e download de PDF de contrato.
 - Pacote do Worker: cerca de 4,7 MB (0,9 MB comprimido), dentro do limite de 3 MB do plano gratuito. O limite de CPU de 10 ms do plano gratuito continua sendo um risco para o hash de senha: provavelmente será preciso o **Workers Paid (US$ 5/mês)**.
 
-Falta ligar na conta: ids reais do D1 e do R2, segredos, rota no domínio e o front (seção 4).
+Também pronto: o Worker do front (`app/wrangler.jsonc`: arquivos estáticos com fallback para SPA, testado localmente), as rotas no domínio (`/api/*` para a API, o resto para o front), o ambiente de homologação (`--env staging`, em `staging.mybricks.com.br`, com banco e bucket próprios) e os workflows do GitHub (`.github/workflows`: CI e deploy).
+
+Falta ligar na conta: criar D1 e R2, colocar os ids nos `wrangler.jsonc`, segredos e DNS (seção 4 e o passo a passo).
 
 ## 4. Passos manuais (conta e DNS)
 

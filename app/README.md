@@ -26,7 +26,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-In development Vite proxies `/api` to `http://localhost:3000`, so the browser talks to one origin and the session cookie works as it will in production. Start the API from the repository root (`npm run db:up`, then `npm run dev:api`; see [`api/README.md`](../api/README.md)).
+In development Vite proxies `/api` to `http://localhost:3000`, so the browser talks to one origin and the session cookie works as it will in production. Start the API from the repository root (`npm run db:migrate`, then `npm run dev:api`; see [`api/README.md`](../api/README.md)).
 
 ## Scripts
 
