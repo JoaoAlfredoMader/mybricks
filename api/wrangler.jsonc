@@ -17,8 +17,7 @@
     {
       "binding": "DB",
       "database_name": "mybricks",
-      // Replace with the id printed by `npx wrangler d1 create mybricks`.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "7ace96ca-b2b8-4833-b126-b205253e8490",
       // The same .sql files Drizzle generates; `npm run db:deploy` applies them.
       "migrations_dir": "migrations"
     }
@@ -57,8 +56,7 @@
         {
           "binding": "DB",
           "database_name": "mybricks-staging",
-          // Replace with the id printed by `npx wrangler d1 create mybricks-staging`.
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_id": "e0422c86-7a4b-4b4e-87f7-e07503fd0164",
           "migrations_dir": "migrations"
         }
       ],
