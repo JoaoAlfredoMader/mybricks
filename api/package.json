@@ -1,0 +1,56 @@
+{
+  "name": "my-bricks-back-end",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MyBricks API: real-estate portfolio management (Hono, Prisma, PostgreSQL, Better Auth).",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "admin:create": "tsx --env-file=.env src/scripts/create-platform-admin.ts",
+    "maintenance": "tsx --env-file=.env src/scripts/maintenance.ts",
+    "openapi:export": "tsx src/scripts/export-openapi.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:generate": "prisma generate",
+    "db:seed": "prisma db seed",
+    "db:seed:fetch-cities": "tsx prisma/seed/fetch-cities.ts",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1161.0",
+    "@hono/node-server": "^2.1.6",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "@scalar/hono-api-reference": "^0.12.17",
+    "better-auth": "^1.7.15",
+    "dotenv": "^18.0.9",
+    "hono": "^4.13.16",
+    "htmlparser2": "^12.0.0",
+    "pdfkit": "^0.20.2",
+    "pg": "^8.23.1",
+    "sanitize-html": "^2.18.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@scalar/openapi-parser": "^0.29.19",
+    "@types/node": "^24.19.2",
+    "@types/pdfkit": "^0.17.7",
+    "@types/pg": "^8.23.1",
+    "@types/sanitize-html": "^2.16.2",
+    "prisma": "^7.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
