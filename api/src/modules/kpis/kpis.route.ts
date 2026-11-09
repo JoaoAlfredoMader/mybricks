@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { requireAuth } from "../../shared/http/auth.middleware.js";
 import { tenantScope } from "../../shared/http/tenant.js";
@@ -41,8 +41,8 @@ export const cashFlowQuerySchema = z
   });
 
 /** Route layer: read-only indicators, always calculated on request from the stored data. */
-export function createKpisRoutes(prisma: PrismaClient) {
-  const controller = createKpisController(createKpisService(createKpisRepository(prisma)));
+export function createKpisRoutes(db: Database) {
+  const controller = createKpisController(createKpisService(createKpisRepository(db)));
 
   return new Hono<AppEnv>()
     .use(requireAuth)

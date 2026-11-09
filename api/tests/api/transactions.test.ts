@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { check } from "../helpers/check.js";
-import { type ApiResponse, Session, prisma, resetDatabase, signUp } from "../helpers/world.js";
+import { count, eq } from "drizzle-orm";
+import { members, transactions } from "../../src/db/schema.js";
+import { type ApiResponse, Session, close, db, resetDatabase, signUp } from "../helpers/world.js";
 
 
 
@@ -14,7 +16,7 @@ describe("Transactions API", () => {
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   beforeAll(resetDatabase);
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("sets up the scenario", async () => {
     const anon = new Session();
@@ -24,7 +26,7 @@ describe("Transactions API", () => {
     ana = await signUp("Ana Souza", "ana@example.com");
     bia = await signUp("Bia Lima", "bia@example.com");
     carlos = await signUp("Carlos Dias", "carlos@example.com");
-    await prisma.member.create({ data: { organizationId: ana.organizationId, userId: bia.userId, role: "member" } });
+    await db.insert(members).values({ organizationId: ana.organizationId, userId: bia.userId, role: "member" });
     await bia.session.call("POST", "/api/auth/organization/set-active", { organizationId: ana.organizationId });
 
     const mkProperty = async (who: typeof ana, name: string) => {
@@ -77,7 +79,7 @@ describe("Transactions API", () => {
     await bad("non-uuid property -> 400", { ...base, propertyId: "x" }, "propertyId");
     await bad("unknown category -> 400", { ...base, categoryId: 99999 }, "categoryId");
     await bad("description above 500 characters -> 400", { ...base, description: "x".repeat(501) }, "description");
-    check("failed creates left nothing behind", (await prisma.transaction.count()) === 4);
+    check("failed creates left nothing behind", (await db.select({ value: count() }).from(transactions))[0]?.value === 4);
     check("unknown property -> 404", (await ana.session.call("POST", "/api/transactions", { ...base, propertyId: "00000000-0000-4000-8000-000000000000" })).status === 404);
     check("another organization's property -> 404", (await ana.session.call("POST", "/api/transactions", { ...base, propertyId: carlosProp })).status === 404);
   });
@@ -195,10 +197,10 @@ describe("Transactions API", () => {
       (await carlos.session.call("PATCH", `/api/transactions/${t1.id}`, { amountCents: 1 })).status === 404 &&
       (await carlos.session.call("DELETE", `/api/transactions/${t1.id}`)).status === 404);
     check("other organization lists nothing of ours", (await carlos.session.call("GET", "/api/transactions")).json?.total === 0);
-    check("transaction untouched after cross-tenant attempts", (await prisma.transaction.findUnique({ where: { id: t1.id } }))?.amountCents === 52_000_000n);
+    check("transaction untouched after cross-tenant attempts", (await db.select().from(transactions).where(eq(transactions.id, t1.id)))[0]?.amountCents === 52_000_000n);
   });
 
   it("property deletion", async () => {
-    check("deleting the property removes its transactions", (await ana.session.call("DELETE", `/api/properties/${casa}`)).status === 204 && (await prisma.transaction.count({ where: { propertyId: casa } })) === 0);
+    check("deleting the property removes its transactions", (await ana.session.call("DELETE", `/api/properties/${casa}`)).status === 204 && (await db.select({ value: count() }).from(transactions).where(eq(transactions.propertyId, casa)))[0]?.value === 0);
   });
 });

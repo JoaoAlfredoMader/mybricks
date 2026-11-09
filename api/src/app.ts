@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import { DEFAULT_LISTINGS_WHATSAPP_NUMBER, type Env } from "./config/env.js";
-import type { PrismaClient } from "./lib/prisma.js";
+import type { Database } from "./db/database.js";
 import type { StorageProvider } from "./lib/storage/storage.js";
 import type { Auth } from "./modules/auth/auth.js";
 import { createAgenciesRoutes } from "./modules/agencies/agencies.route.js";
@@ -34,7 +34,7 @@ import type { AppEnv } from "./shared/http/app-env.js";
 import { blockDeletesWhileImpersonating, loadAuthContext } from "./shared/http/auth.middleware.js";
 
 export interface AppDependencies {
-  prisma: PrismaClient;
+  db: Database;
   env: Pick<Env, "FRONTEND_URL"> & Partial<Pick<Env, "NODE_ENV" | "MAX_UPLOAD_MB" | "BETTER_AUTH_URL" | "LISTINGS_WHATSAPP_NUMBER">>;
   auth: Auth;
   provisioning: ProvisioningService;
@@ -43,7 +43,7 @@ export interface AppDependencies {
   storage: StorageProvider;
 }
 
-export function createApp({ prisma, env, auth, provisioning, audit, storage }: AppDependencies) {
+export function createApp({ db, env, auth, provisioning, audit, storage }: AppDependencies) {
   const maxUploadBytes = (env.MAX_UPLOAD_MB ?? 15) * 1024 * 1024;
   const listings = { whatsappNumber: env.LISTINGS_WHATSAPP_NUMBER ?? DEFAULT_LISTINGS_WHATSAPP_NUMBER };
   const app = new Hono<AppEnv>();
@@ -52,13 +52,13 @@ export function createApp({ prisma, env, auth, provisioning, audit, storage }: A
   if (env.NODE_ENV !== "test") app.use(logger());
   app.use("/api/*", cors({ origin: env.FRONTEND_URL, credentials: true }));
 
-  app.route("/health", createHealthRoutes(prisma));
+  app.route("/health", createHealthRoutes(db));
   app.route("/api", createOpenApiRoutes({ serverUrl: env.BETTER_AUTH_URL ?? "http://localhost:3000" }));
 
   // Better Auth answers on its own; everything else under /api gets the session context.
   app.route("/api/auth", createAuthRoutes(auth));
   // The public listings need no session, so they are mounted before it is loaded.
-  app.route("/api/listings", createListingsRoutes(prisma, storage, listings));
+  app.route("/api/listings", createListingsRoutes(db, storage, listings));
   app.use("/api/*", loadAuthContext(auth, provisioning));
   app.use("/api/*", blockDeletesWhileImpersonating);
   app.use("/api/*", async (c, next) => {
@@ -66,25 +66,25 @@ export function createApp({ prisma, env, auth, provisioning, audit, storage }: A
     await next();
   });
   app.route("/api/me", createSessionRoutes());
-  app.route("/api/admin/audit-logs", createAdminAuditRoutes(prisma));
-  app.route("/api/admin/feedback", createAdminFeedbackRoutes(prisma));
-  app.route("/api/admin/listings", createAdminListingsRoutes(prisma, storage, listings));
-  app.route("/api/audit-logs", createAuditRoutes(prisma));
-  app.route("/api/agencies", createAgenciesRoutes(prisma));
-  app.route("/api/clients", createClientsRoutes(prisma));
-  app.route("/api/contract-template", createContractTemplatesRoutes(prisma));
-  app.route("/api/contracts/:id/pdf", createContractDocumentsRoutes(prisma, storage));
-  app.route("/api/contracts", createContractsRoutes(prisma));
-  app.route("/api/feedback", createFeedbackRoutes(prisma));
-  app.route("/api/kpis", createKpisRoutes(prisma));
-  app.route("/api/lookups", createLookupsRoutes(prisma));
-  app.route("/api/properties", createPropertiesRoutes(prisma));
-  app.route("/api/properties/:propertyId/documents", createDocumentsRoutes(prisma, storage, maxUploadBytes));
-  app.route("/api/properties/:propertyId/photos", createPhotosRoutes(prisma, storage, maxUploadBytes));
-  app.route("/api/properties/:propertyId/proposals", createProposalsRoutes(prisma));
-  app.route("/api/occupants", createOccupantsRoutes(prisma));
-  app.route("/api/reservations", createReservationsRoutes(prisma));
-  app.route("/api/transactions", createTransactionsRoutes(prisma));
+  app.route("/api/admin/audit-logs", createAdminAuditRoutes(db));
+  app.route("/api/admin/feedback", createAdminFeedbackRoutes(db));
+  app.route("/api/admin/listings", createAdminListingsRoutes(db, storage, listings));
+  app.route("/api/audit-logs", createAuditRoutes(db));
+  app.route("/api/agencies", createAgenciesRoutes(db));
+  app.route("/api/clients", createClientsRoutes(db));
+  app.route("/api/contract-template", createContractTemplatesRoutes(db));
+  app.route("/api/contracts/:id/pdf", createContractDocumentsRoutes(db, storage));
+  app.route("/api/contracts", createContractsRoutes(db));
+  app.route("/api/feedback", createFeedbackRoutes(db));
+  app.route("/api/kpis", createKpisRoutes(db));
+  app.route("/api/lookups", createLookupsRoutes(db));
+  app.route("/api/properties", createPropertiesRoutes(db));
+  app.route("/api/properties/:propertyId/documents", createDocumentsRoutes(db, storage, maxUploadBytes));
+  app.route("/api/properties/:propertyId/photos", createPhotosRoutes(db, storage, maxUploadBytes));
+  app.route("/api/properties/:propertyId/proposals", createProposalsRoutes(db));
+  app.route("/api/occupants", createOccupantsRoutes(db));
+  app.route("/api/reservations", createReservationsRoutes(db));
+  app.route("/api/transactions", createTransactionsRoutes(db));
 
   app.notFound((c) =>
     c.json({ error: { code: "NOT_FOUND", message: "Route not found" } }, 404),

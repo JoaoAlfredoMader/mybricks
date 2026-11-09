@@ -7,16 +7,11 @@ import { defineConfig } from "vitest/config";
 export const TEST_STORAGE_DIR = join(tmpdir(), "mybricks-test-storage");
 
 /**
- * Tests run against their own database (`<name>_test` on the same server), never against the
- * development one: the scenarios truncate the auth tables.
+ * Tests run against their own SQLite file, never against the development one: the scenarios wipe the
+ * auth tables. One file per run (the process id keeps two simultaneous runs apart); the global setup
+ * creates it and the teardown removes it.
  */
-function testDatabaseUrl(): string {
-  const source = process.env.DATABASE_URL ?? "postgresql://mybricks:mybricks@localhost:5433/mybricks?schema=public";
-  const url = new URL(source);
-  const name = url.pathname.slice(1);
-  if (!name.endsWith("_test")) url.pathname = `/${name}_test`;
-  return url.toString();
-}
+export const TEST_DATABASE_FILE = join(tmpdir(), `mybricks-test-${process.pid}.db`);
 
 export default defineConfig({
   test: {
@@ -24,7 +19,7 @@ export default defineConfig({
     globalSetup: ["tests/global-setup.ts"],
     env: {
       NODE_ENV: "test",
-      DATABASE_URL: testDatabaseUrl(),
+      DATABASE_URL: `file:${TEST_DATABASE_FILE}`,
       // Deterministic whatever the developer's .env says: e-mail is only printed, nobody has to confirm it.
       EMAIL_DRIVER: "log",
       REQUIRE_EMAIL_VERIFICATION: "false",

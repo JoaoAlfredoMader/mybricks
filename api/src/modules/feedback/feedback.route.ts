@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { audited } from "../../shared/http/audit.middleware.js";
 import { requireAuth, requirePlatformAdmin } from "../../shared/http/auth.middleware.js";
@@ -15,13 +15,13 @@ import {
 } from "./feedback.schemas.js";
 import { createFeedbackService } from "./feedback.service.js";
 
-function createController(prisma: PrismaClient) {
-  return createFeedbackController(createFeedbackService(createFeedbackRepository(prisma)));
+function createController(db: Database) {
+  return createFeedbackController(createFeedbackService(createFeedbackRepository(db)));
 }
 
 /** Route layer, for the people using the app: send feedback and see what they sent. */
-export function createFeedbackRoutes(prisma: PrismaClient) {
-  const controller = createController(prisma);
+export function createFeedbackRoutes(db: Database) {
+  const controller = createController(db);
 
   return new Hono<AppEnv>()
     .use(requireAuth)
@@ -36,8 +36,8 @@ export function createFeedbackRoutes(prisma: PrismaClient) {
 }
 
 /** Route layer, for the platform operator (owner panel): read everything and close the loop. */
-export function createAdminFeedbackRoutes(prisma: PrismaClient) {
-  const controller = createController(prisma);
+export function createAdminFeedbackRoutes(db: Database) {
+  const controller = createController(db);
 
   return new Hono<AppEnv>()
     .use(requirePlatformAdmin)

@@ -1,6 +1,6 @@
 /**
  * Downloads the Brazilian municipalities from the IBGE API and writes the compact dataset
- * used by the seed: prisma/seed/data/cities.json -> [[ibgeCode, name, state], ...]
+ * used by the seed: src/db/reference-data/cities.json -> [[ibgeCode, name, state], ...]
  *
  * Run only when the official list changes: npm run db:seed:fetch-cities
  */
@@ -37,7 +37,7 @@ async function main() {
   const keys = new Set(rows.map(([, name, state]) => `${state}|${name}`));
   if (keys.size !== rows.length) throw new Error("Duplicate (state, name) found: the unique key would fail");
 
-  const output = resolve(dirname(fileURLToPath(import.meta.url)), "data", "cities.json");
+  const output = resolve(dirname(fileURLToPath(import.meta.url)), "..", "db", "reference-data", "cities.json");
   await mkdir(dirname(output), { recursive: true });
   await writeFile(output, `${JSON.stringify(rows)}\n`);
   console.log(`Wrote ${rows.length} municipalities to ${output}`);

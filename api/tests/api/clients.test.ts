@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { check } from "../helpers/check.js";
-import { Session, prisma, resetDatabase, signUp } from "../helpers/world.js";
+import { eq } from "drizzle-orm";
+import { clients, members, properties, propertyTypeUsages } from "../../src/db/schema.js";
+import { Session, close, db, resetDatabase, signUp } from "../helpers/world.js";
 
 const CPF_1 = "529.982.247-25";
 const CPF_2 = "168.995.350-09";
@@ -16,7 +18,7 @@ describe("Clients API", () => {
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   beforeAll(resetDatabase);
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("unauthenticated", async () => {
     const anon = new Session();
@@ -28,7 +30,7 @@ describe("Clients API", () => {
     carlos = await signUp("Carlos Dias", "carlos@example.com");
 
     // Bia becomes a plain member of Ana's organization (drops her own personal one as active).
-    await prisma.member.create({ data: { organizationId: ana.organizationId, userId: bia.userId, role: "member" } });
+    await db.insert(members).values({ organizationId: ana.organizationId, userId: bia.userId, role: "member" });
     const setActive = await bia.session.call("POST", "/api/auth/organization/set-active", { organizationId: ana.organizationId });
     check("member can activate the organization", setActive.status === 200, setActive);
     const meBia = await bia.session.call("GET", "/api/me");
@@ -46,7 +48,7 @@ describe("Clients API", () => {
     check("whatsapp digits only", maria?.whatsapp === "11988887777", maria);
     check("personType defaults to individual", maria?.personType === "individual", maria);
     check("authorship is the caller", maria?.createdById === ana.userId, maria);
-    const row = await prisma.client.findUnique({ where: { id: maria.id } });
+    const [row] = await db.select().from(clients).where(eq(clients.id, maria.id));
     check("stored in the caller's organization", row?.organizationId === ana.organizationId, row);
 
     const blank = await ana.session.call("POST", "/api/clients", { name: "Sem Contato", document: "", email: " ", whatsapp: "" });
@@ -139,22 +141,20 @@ describe("Clients API", () => {
     check("other organization cannot delete the client (404)", (await carlos.session.call("DELETE", `/api/clients/${maria.id}`)).status === 404);
     const carlosList = await carlos.session.call("GET", "/api/clients");
     check("other organization lists only its own", carlosList.json?.total === 1 && carlosList.json.items[0].name === "Maria do Carlos", carlosList.json);
-    const stillThere = await prisma.client.findUnique({ where: { id: maria.id } });
+    const [stillThere] = await db.select().from(clients).where(eq(clients.id, maria.id));
     check("client untouched after cross-tenant attempts", stillThere?.name === "Maria O. Santos", stillThere);
   });
 
   it("delete", async () => {
-    const usage = await prisma.propertyTypeUsage.findFirst();
+    const [usage] = await db.select().from(propertyTypeUsages).limit(1);
     if (!usage) throw new Error("reference data missing: run npm run db:seed");
-    const property = await prisma.property.create({
-      data: {
-        organizationId: ana.organizationId, createdById: ana.userId, clientId: company.json.id,
-        name: "Sala 101", propertyType: usage.propertyType, usageType: usage.usageType,
-      },
-    });
+    const [property] = await db.insert(properties).values({
+      organizationId: ana.organizationId, createdById: ana.userId, clientId: company.json.id,
+      name: "Sala 101", propertyType: usage.propertyType, usageType: usage.usageType,
+    }).returning();
     const blocked = await ana.session.call("DELETE", `/api/clients/${company.json.id}`);
     check("delete client that owns properties -> 409 with count", blocked.status === 409 && blocked.json?.error?.details?.properties === 1, blocked);
-    await prisma.property.delete({ where: { id: property.id } });
+    await db.delete(properties).where(eq(properties.id, property!.id));
     const deleted = await ana.session.call("DELETE", `/api/clients/${company.json.id}`);
     check("delete -> 204", deleted.status === 204, deleted);
     check("deleted client is gone (404)", (await ana.session.call("GET", `/api/clients/${company.json.id}`)).status === 404);

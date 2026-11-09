@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { count, eq, like } from "drizzle-orm";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { sweepOrphanFiles } from "../../src/modules/files/orphan-sweep.js";
 import { check } from "../helpers/check.js";
 import { HTML_AS_IMAGE, JPEG, MIME, PDF, PNG, WEBP } from "../helpers/fixtures.js";
-import { type Account, Session, createCast, prisma, resetDatabase, storage } from "../helpers/world.js";
+import { propertyPhotos, storedFiles } from "../../src/db/schema.js";
+import { type Account, Session, close, createCast, db, resetDatabase, storage } from "../helpers/world.js";
 
 const photos = (propertyId: string) => `/api/properties/${propertyId}/photos`;
 const UNKNOWN = "00000000-0000-4000-8000-000000000000";
@@ -29,12 +31,12 @@ describe("Property photos API", () => {
     return r.json.id as string;
   };
   const keyOf = async (photoId: string) =>
-    (await prisma.propertyPhoto.findUniqueOrThrow({ where: { id: photoId }, select: { file: { select: { storageKey: true } } } })).file.storageKey;
+    (await db.select({ storageKey: storedFiles.storageKey }).from(propertyPhotos).innerJoin(storedFiles, eq(storedFiles.id, propertyPhotos.fileId)).where(eq(propertyPhotos.id, photoId)))[0]!.storageKey;
 
   beforeAll(async () => {
     await resetDatabase();
   });
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("requires a session", async () => {
     const anon = new Session();
@@ -54,7 +56,7 @@ describe("Property photos API", () => {
     check("it is the cover: position 0, with name, type and size", first.json?.position === 0 && first.json.fileName === "fachada.png" && first.json.mimeType === "image/png" && first.json.sizeBytes === PNG.length && first.json.propertyId === apto, first.json);
     check("the content URL points to the endpoint that serves it", first.json?.contentUrl === `${photos(apto)}/${first.json.id}/content`, first.json?.contentUrl);
 
-    const stored = await prisma.storedFile.findFirstOrThrow({ where: { photos: { some: { id: p1.id } } } });
+    const stored = (await db.select().from(storedFiles).innerJoin(propertyPhotos, eq(propertyPhotos.fileId, storedFiles.id)).where(eq(propertyPhotos.id, p1.id)))[0]!.stored_files;
     check("the file is recorded for the organization and the uploader", stored.organizationId === ana.organizationId && stored.uploadedById === ana.userId && stored.mimeType === "image/png" && stored.sizeBytes === BigInt(PNG.length), stored);
     check("the key is <organization>/<uuid>.png and never the client's name", /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/.test(stored.storageKey) && stored.storageKey.startsWith(`${ana.organizationId}/`) && !stored.storageKey.includes("fachada"), stored.storageKey);
     check("the bytes are in the storage", (await storage.get(stored.storageKey))?.body.equals(PNG) === true);
@@ -119,7 +121,7 @@ describe("Property photos API", () => {
     await reject("a file over the limit -> 413 with the limit", 413, "PAYLOAD_TOO_LARGE", { name: "big.png", type: MIME.png, bytes: tooBig });
     check("the limit is reported in bytes", (await ana.session.upload(photos(apto), { name: "big.png", type: MIME.png, bytes: tooBig })).json?.error?.details?.maxBytes === 1024 * 1024);
 
-    check("nothing was left behind by the rejected uploads", (await prisma.propertyPhoto.count({ where: { propertyId: apto } })) === 3 && (await prisma.storedFile.count({ where: { organizationId: ana.organizationId } })) === 3);
+    check("nothing was left behind by the rejected uploads", (await db.select({ value: count() }).from(propertyPhotos).where(eq(propertyPhotos.propertyId, apto)))[0]!.value === 3 && (await db.select({ value: count() }).from(storedFiles).where(eq(storedFiles.organizationId, ana.organizationId)))[0]!.value === 3);
     check("unknown property -> 404", (await ana.session.upload(photos(UNKNOWN), { name: "a.png", type: MIME.png, bytes: PNG })).status === 404);
     check("non-uuid property -> 400", (await ana.session.upload(photos("xyz"), { name: "a.png", type: MIME.png, bytes: PNG })).status === 400);
   });
@@ -127,8 +129,8 @@ describe("Property photos API", () => {
   it("caps the photos of a property", async () => {
     const full = await mk(ana, "Casa cheia");
     const files = Array.from({ length: 30 }, () => ({ id: randomUUID(), key: `${ana.organizationId}/${randomUUID()}.png` }));
-    await prisma.storedFile.createMany({ data: files.map((f) => ({ id: f.id, organizationId: ana.organizationId, uploadedById: ana.userId, storageKey: f.key, fileName: "x.png", mimeType: "image/png", sizeBytes: 1n })) });
-    await prisma.propertyPhoto.createMany({ data: files.map((f, position) => ({ organizationId: ana.organizationId, propertyId: full, fileId: f.id, position })) });
+    await db.insert(storedFiles).values(files.map((f) => ({ id: f.id, organizationId: ana.organizationId, uploadedById: ana.userId, storageKey: f.key, fileName: "x.png", mimeType: "image/png", sizeBytes: 1n })));
+    await db.insert(propertyPhotos).values(files.map((f, position) => ({ organizationId: ana.organizationId, propertyId: full, fileId: f.id, position })));
 
     const over = await ana.session.upload(photos(full), { name: "a.png", type: MIME.png, bytes: PNG });
     check("the 31st photo -> 422", over.status === 422 && over.json?.error?.code === "BUSINESS_RULE_VIOLATION", over);
@@ -152,7 +154,7 @@ describe("Property photos API", () => {
       (await carlos.session.download(p1.contentUrl)).status === 404 &&
       (await carlos.session.call("PUT", `${photos(apto)}/order`, { photoIds: [p1.id] })).status === 404 &&
       (await carlos.session.call("DELETE", `${photos(apto)}/${p1.id}`)).status === 404);
-    check("the other organization's files are stored under its own prefix", (await carlos.session.upload(photos(carlosProperty), { name: "c.png", type: MIME.png, bytes: PNG })).status === 201 && (await prisma.storedFile.count({ where: { storageKey: { startsWith: `${carlos.organizationId}/` } } })) === 1);
+    check("the other organization's files are stored under its own prefix", (await carlos.session.upload(photos(carlosProperty), { name: "c.png", type: MIME.png, bytes: PNG })).status === 201 && (await db.select({ value: count() }).from(storedFiles).where(like(storedFiles.storageKey, `${carlos.organizationId}/%`)))[0]!.value === 1);
   });
 
   it("deletes the photo, its record and its object", async () => {
@@ -160,7 +162,7 @@ describe("Property photos API", () => {
     check("(setup) the object exists", (await storage.get(key)) !== null);
     const deleted = await ana.session.call("DELETE", `${photos(apto)}/${p2.id}`);
     check("delete -> 204", deleted.status === 204, deleted);
-    check("the file record is gone", (await prisma.storedFile.count({ where: { storageKey: key } })) === 0);
+    check("the file record is gone", (await db.select({ value: count() }).from(storedFiles).where(eq(storedFiles.storageKey, key)))[0]!.value === 0);
     check("the object is gone from the storage", (await storage.get(key)) === null);
     check("the list shrinks", (await ana.session.call("GET", photos(apto))).json?.length === 2);
     check("delete twice -> 404", (await ana.session.call("DELETE", `${photos(apto)}/${p2.id}`)).status === 404);
@@ -175,15 +177,15 @@ describe("Property photos API", () => {
 
   it("sweeps the files that nothing points to any more", async () => {
     const key = await keyOf(p1.id);
-    check("deleting the property cascades the photo rows", (await ana.session.call("DELETE", `/api/properties/${apto}`)).status === 204 && (await prisma.propertyPhoto.count({ where: { propertyId: apto } })) === 0);
-    check("…but the file records and the object stay until the sweep", (await prisma.storedFile.count({ where: { storageKey: key } })) === 1 && (await storage.get(key)) !== null);
+    check("deleting the property cascades the photo rows", (await ana.session.call("DELETE", `/api/properties/${apto}`)).status === 204 && (await db.select({ value: count() }).from(propertyPhotos).where(eq(propertyPhotos.propertyId, apto)))[0]!.value === 0);
+    check("…but the file records and the object stay until the sweep", (await db.select({ value: count() }).from(storedFiles).where(eq(storedFiles.storageKey, key)))[0]!.value === 1 && (await storage.get(key)) !== null);
 
-    check("a recent file is not swept (an upload may be in flight)", (await sweepOrphanFiles(prisma, storage, { olderThan: new Date(Date.now() - 3_600_000) })) === 0 && (await storage.get(key)) !== null);
-    const swept = await sweepOrphanFiles(prisma, storage, { olderThan: new Date(Date.now() + 1000) });
-    check("the sweep removes orphan records and objects", swept >= 1 && (await prisma.storedFile.count({ where: { storageKey: key } })) === 0 && (await storage.get(key)) === null, swept);
+    check("a recent file is not swept (an upload may be in flight)", (await sweepOrphanFiles(db, storage, { olderThan: new Date(Date.now() - 3_600_000) })) === 0 && (await storage.get(key)) !== null);
+    const swept = await sweepOrphanFiles(db, storage, { olderThan: new Date(Date.now() + 1000) });
+    check("the sweep removes orphan records and objects", swept >= 1 && (await db.select({ value: count() }).from(storedFiles).where(eq(storedFiles.storageKey, key)))[0]!.value === 0 && (await storage.get(key)) === null, swept);
 
-    const stillUsed = await prisma.propertyPhoto.findFirstOrThrow({ where: { propertyId: biaProperty }, select: { file: { select: { storageKey: true } } } });
+    const stillUsed = { file: (await db.select({ storageKey: storedFiles.storageKey }).from(propertyPhotos).innerJoin(storedFiles, eq(storedFiles.id, propertyPhotos.fileId)).where(eq(propertyPhotos.propertyId, biaProperty)).limit(1))[0]! };
     check("files that are still referenced survive the sweep", (await storage.get(stillUsed.file.storageKey)) !== null && (await ana.session.call("GET", photos(biaProperty))).json?.length === 1);
-    check("a second sweep has nothing to do", (await sweepOrphanFiles(prisma, storage, { olderThan: new Date(Date.now() + 1000) })) === 0);
+    check("a second sweep has nothing to do", (await sweepOrphanFiles(db, storage, { olderThan: new Date(Date.now() + 1000) })) === 0);
   });
 });

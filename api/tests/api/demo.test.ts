@@ -3,7 +3,9 @@ import { createContainer } from "../../src/container.js";
 import { runMaintenance } from "../../src/modules/maintenance/maintenance.js";
 import { check } from "../helpers/check.js";
 import { MIME, PNG } from "../helpers/fixtures.js";
-import { Session, env, prisma, resetDatabase, storage } from "../helpers/world.js";
+import { agencies, clients, contracts, occupants, organizations, properties, reservations, sessions, storedFiles, transactions, users } from "../../src/db/schema.js";
+import { countWhere, firstWhere, updateWhere } from "../helpers/db.js";
+import { Session, close, db, env, resetDatabase, storage } from "../helpers/world.js";
 
 /**
  * The only tests that wire the app WITH the sample portfolio, the way the server runs: a guest
@@ -23,8 +25,8 @@ describe("Guest workspace with the sample portfolio", () => {
     await resetDatabase();
   });
   afterAll(async () => {
-    await demoApp.prisma.$disconnect();
-    await prisma.$disconnect();
+    demoApp.close();
+    close();
   });
 
   it("fills the demo workspace when a guest signs in", async () => {
@@ -33,19 +35,19 @@ describe("Guest workspace with the sample portfolio", () => {
     const me = await guest.call("GET", "/api/me");
     organizationId = me.json.organizationId;
     guestId = me.json.user.id;
-    check("the guest works in a demo organization that expires", me.json.user.isAnonymous === true && (await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } })).isDemo === true);
+    check("the guest works in a demo organization that expires", me.json.user.isAnonymous === true && (await firstWhere(organizations, { id: organizationId })).isDemo === true);
 
     const counts = {
-      properties: await prisma.property.count({ where: { organizationId } }),
-      clients: await prisma.client.count({ where: { organizationId } }),
-      agencies: await prisma.agency.count({ where: { organizationId } }),
-      occupants: await prisma.occupant.count({ where: { organizationId } }),
-      contracts: await prisma.contract.count({ where: { organizationId } }),
-      reservations: await prisma.reservation.count({ where: { organizationId } }),
-      transactions: await prisma.transaction.count({ where: { organizationId } }),
+      properties: await countWhere(properties, { organizationId }),
+      clients: await countWhere(clients, { organizationId }),
+      agencies: await countWhere(agencies, { organizationId }),
+      occupants: await countWhere(occupants, { organizationId }),
+      contracts: await countWhere(contracts, { organizationId }),
+      reservations: await countWhere(reservations, { organizationId }),
+      transactions: await countWhere(transactions, { organizationId }),
     };
     check("the sample portfolio is there", counts.properties === 9 && counts.clients === 3 && counts.agencies === 1 && counts.occupants === 11 && counts.contracts === 4 && counts.reservations === 8 && counts.transactions === 6, counts);
-    check("everything is authored by the guest, who is a member of the organization", (await prisma.property.count({ where: { organizationId, createdById: guestId } })) === 9 && (await prisma.client.count({ where: { organizationId, createdById: guestId } })) === 3);
+    check("everything is authored by the guest, who is a member of the organization", (await countWhere(properties, { organizationId, createdById: guestId })) === 9 && (await countWhere(clients, { organizationId, createdById: guestId })) === 3);
   });
 
   it("is a working workspace for every module of the API", async () => {
@@ -97,9 +99,9 @@ describe("Guest workspace with the sample portfolio", () => {
     const signUp = await guest.call("POST", "/api/auth/sign-up/email", { name: "Bruno Lima", email: "bruno@example.com", password: "outra-senha-123" });
     check("sign-up -> 200", signUp.status === 200, signUp);
     const me = await guest.call("GET", "/api/me");
-    check("the same organization, now permanent", me.json?.organizationId === organizationId && (await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } })).isDemo === false);
-    check("with all the data and the new user as the author", (await guest.call("GET", "/api/properties?pageSize=100")).json?.total === 9 && (await prisma.property.count({ where: { organizationId, createdById: me.json.user.id } })) === 9);
-    check("so the maintenance leaves it alone", (await runMaintenance({ prisma, storage, now: new Date(Date.now() + 30 * 86_400_000) })).expiredDemoOrganizations === 0 && (await prisma.property.count({ where: { organizationId } })) === 9);
+    check("the same organization, now permanent", me.json?.organizationId === organizationId && (await firstWhere(organizations, { id: organizationId })).isDemo === false);
+    check("with all the data and the new user as the author", (await guest.call("GET", "/api/properties?pageSize=100")).json?.total === 9 && (await countWhere(properties, { organizationId, createdById: me.json.user.id })) === 9);
+    check("so the maintenance leaves it alone", (await runMaintenance({ db, storage, now: new Date(Date.now() + 30 * 86_400_000) })).expiredDemoOrganizations === 0 && (await countWhere(properties, { organizationId })) === 9);
   });
 
   it("is removed, with its files, when an untouched guest workspace expires", async () => {
@@ -107,17 +109,17 @@ describe("Guest workspace with the sample portfolio", () => {
     await other.call("POST", "/api/auth/sign-in/anonymous");
     const me = await other.call("GET", "/api/me");
     const orgId = me.json.organizationId as string;
-    const properties = (await other.call("GET", "/api/properties?pageSize=1")).json.items[0];
-    const photo = await other.upload(`/api/properties/${properties.id}/photos`, { name: "a.png", type: MIME.png, bytes: PNG });
-    const key = (await prisma.storedFile.findFirstOrThrow({ where: { organizationId: orgId } })).storageKey;
+    const firstProperty = (await other.call("GET", "/api/properties?pageSize=1")).json.items[0];
+    const photo = await other.upload(`/api/properties/${firstProperty.id}/photos`, { name: "a.png", type: MIME.png, bytes: PNG });
+    const key = (await firstWhere(storedFiles, { organizationId: orgId })).storageKey;
     check("(setup) the second guest has data and a file", photo.status === 201 && (await storage.get(key)) !== null);
 
-    await prisma.organization.update({ where: { id: orgId }, data: { demoExpiresAt: new Date(Date.now() - 1000) } });
-    const report = await runMaintenance({ prisma, storage });
+    await updateWhere(organizations, { id: orgId }, { demoExpiresAt: new Date(Date.now() - 1000) });
+    const report = await runMaintenance({ db, storage });
     check("the report counts the organization and the guest account", report.expiredDemoOrganizations === 1 && report.anonymousUsersRemoved === 1, report);
-    check("every row of the sample portfolio is gone", (await prisma.organization.count({ where: { id: orgId } })) === 0 && (await prisma.property.count({ where: { organizationId: orgId } })) === 0 && (await prisma.client.count({ where: { organizationId: orgId } })) === 0 && (await prisma.occupant.count({ where: { organizationId: orgId } })) === 0 && (await prisma.agency.count({ where: { organizationId: orgId } })) === 0 && (await prisma.storedFile.count({ where: { organizationId: orgId } })) === 0);
+    check("every row of the sample portfolio is gone", (await countWhere(organizations, { id: orgId })) === 0 && (await countWhere(properties, { organizationId: orgId })) === 0 && (await countWhere(clients, { organizationId: orgId })) === 0 && (await countWhere(occupants, { organizationId: orgId })) === 0 && (await countWhere(agencies, { organizationId: orgId })) === 0 && (await countWhere(storedFiles, { organizationId: orgId })) === 0);
     check("so is the uploaded object", (await storage.get(key)) === null);
-    check("and the guest account with its sessions", (await prisma.user.count({ where: { id: me.json.user.id } })) === 0 && (await prisma.session.count({ where: { userId: me.json.user.id } })) === 0);
+    check("and the guest account with its sessions", (await countWhere(users, { id: me.json.user.id })) === 0 && (await countWhere(sessions, { userId: me.json.user.id })) === 0);
     check("the guest's cookie no longer opens anything (401)", (await other.call("GET", "/api/me")).status === 401);
   });
 });

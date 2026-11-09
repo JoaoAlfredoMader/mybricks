@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { requireAuth } from "../../shared/http/auth.middleware.js";
 import { audited } from "../../shared/http/audit.middleware.js";
@@ -11,8 +11,8 @@ import { clientIdParamSchema, createClientSchema, listClientsQuerySchema, update
 import { createClientsService } from "./clients.service.js";
 
 /** Route layer: HTTP binding (path, validation, serialization). */
-export function createClientsRoutes(prisma: PrismaClient) {
-  const controller = createClientsController(createClientsService(createClientsRepository(prisma)));
+export function createClientsRoutes(db: Database) {
+  const controller = createClientsController(createClientsService(createClientsRepository(db)));
 
   return new Hono<AppEnv>()
     .use(requireAuth)

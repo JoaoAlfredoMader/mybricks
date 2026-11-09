@@ -1,4 +1,4 @@
-import type { ConservationState, PropertyType } from "../../generated/prisma/enums.js";
+import type { ConservationState, PropertyType } from "../../db/enums.js";
 import { centsToNumber } from "../../shared/money.js";
 import type { ListingRecord } from "./listings.repository.js";
 
@@ -62,7 +62,7 @@ export function toListingDto(record: ListingRecord): ListingDto | null {
     subtypeName: record.subtype?.name ?? null,
     salePriceCents: centsToNumber(record.listingPriceCents),
     // Areas are stored in m2, except rural ones, which are in hectares.
-    area: { value: area.toNumber(), unit: record.propertyType === "rural" ? "ha" : "m2" },
+    area: { value: area, unit: record.propertyType === "rural" ? "ha" : "m2" },
     bedrooms: record.bedrooms,
     suites: record.suites,
     bathrooms: record.bathrooms,

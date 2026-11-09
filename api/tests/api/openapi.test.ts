@@ -10,7 +10,9 @@ import { errorResponse } from "../../src/openapi/schemas/common.js";
 import { buildOpenApiDocument } from "../../src/openapi/spec.js";
 import { check } from "../helpers/check.js";
 import { HTML_AS_IMAGE, MIME, PDF, PNG } from "../helpers/fixtures.js";
-import { type ApiResponse, Session, app, env, prisma, resetDatabase, signUp } from "../helpers/world.js";
+import { asc } from "drizzle-orm";
+import { cities } from "../../src/db/schema.js";
+import { type ApiResponse, Session, app, close, db, env, resetDatabase, signUp } from "../helpers/world.js";
 
 const document = buildOpenApiDocument({ serverUrl: "http://localhost:3000" }) as {
   openapi: string;
@@ -196,14 +198,14 @@ describe("The API answers what the document promises", () => {
     await resetDatabase();
   });
   afterAll(async () => {
-    await demo.prisma.$disconnect();
-    await prisma.$disconnect();
+    demo.close();
+    close();
   });
 
   it("signs in a guest with the sample portfolio and the platform admin", async () => {
     guest = new Session(demo.app);
     await guest.call("POST", "/api/auth/sign-in/anonymous");
-    await ensurePlatformAdmin({ auth: demo.auth, prisma: demo.prisma }, { email: "operador@example.com", name: "Operador", password: "senha-do-operador-1" });
+    await ensurePlatformAdmin({ auth: demo.auth, db: demo.db }, { email: "operador@example.com", name: "Operador", password: "senha-do-operador-1" });
     admin = new Session(demo.app);
     await admin.call("POST", "/api/auth/sign-in/email", { email: "operador@example.com", password: "senha-do-operador-1" });
 
@@ -328,10 +330,10 @@ describe("The API answers what the document promises", () => {
   it("the public listings and their moderation", async () => {
     const visitor = new Session(demo.app);
     const owner = await signUp("Dona do Imóvel", "dona@example.com");
-    const city = await prisma.city.findFirstOrThrow({ orderBy: { ibgeCode: "asc" } });
+    const [city] = await db.select().from(cities).orderBy(asc(cities.ibgeCode)).limit(1);
     const created = await api(owner.session, "POST", "/api/properties", {
       name: "Casa à venda", propertyType: "residential", usageType: "rental", privateArea: 90,
-      address: { cityId: city.ibgeCode, street: "Rua Reservada", neighborhood: "Centro" },
+      address: { cityId: city!.ibgeCode, street: "Rua Reservada", neighborhood: "Centro" },
       forSale: { priceCents: 80_000_000, consent: true },
     });
     check("(setup) created for sale: pending until it has a photo", created.json?.forSale?.status === "pending", created.json?.forSale);

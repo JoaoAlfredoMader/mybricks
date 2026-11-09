@@ -1,4 +1,4 @@
-import type { UsageType } from "../../generated/prisma/enums.js";
+import type { UsageType } from "../../db/enums.js";
 import type { CashFlow, IrrUnavailableReason, PortfolioKpis } from "./kpi-calculations.js";
 import type { PropertyStatus } from "../properties/property-status.js";
 

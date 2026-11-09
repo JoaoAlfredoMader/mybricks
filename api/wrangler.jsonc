@@ -1,0 +1,46 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mybricks-api",
+  "main": "src/worker.ts",
+  // Pin the date: it decides which runtime behaviors the Worker gets. Raise it on purpose, not by accident.
+  "compatibility_date": "2026-11-01",
+  // pg (through Prisma), Better Auth and the AWS SDK use Node APIs.
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // pdfkit's browser build resolves an ICC profile path from import.meta.url at load time, which is not
+  // a valid URL inside a Worker bundle and made the Worker fail to start. The profile is only read for
+  // PDF/A documents, which contract-pdf.ts does not produce; any valid URL does.
+  "define": { "import.meta.url": "\"file:///worker/index.js\"" },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mybricks",
+      // Replace with the id printed by `npx wrangler d1 create mybricks`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      // The same .sql files Drizzle generates; `npm run db:deploy` applies them.
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Photos, documents and contract PDFs. Create the bucket once: `npx wrangler r2 bucket create mybricks-files`.
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "mybricks-files" }],
+
+  // Housekeeping (expired demos, orphan files, audit retention): the Node server runs it on a timer.
+  "triggers": { "crons": ["0 * * * *"] },
+
+  // Public settings. Secrets (BETTER_AUTH_SECRET, RESEND_API_KEY)
+  // go in with `npx wrangler secret put <NAME>`; locally they live in api/.dev.vars (see .dev.vars.example).
+  "vars": {
+    "NODE_ENV": "production",
+    "BETTER_AUTH_URL": "https://mybricks.com.br",
+    "FRONTEND_URL": "https://mybricks.com.br",
+    "EMAIL_DRIVER": "resend",
+    "EMAIL_FROM": "MyBricks <nao-responder@mybricks.com.br>",
+    "MAINTENANCE_INTERVAL_MINUTES": "0"
+  }
+
+  // Route on the real domain (the zone has to be on Cloudflare first); the front-end Worker owns the rest:
+  // "routes": [{ "pattern": "mybricks.com.br/api/*", "zone_name": "mybricks.com.br" }]
+}

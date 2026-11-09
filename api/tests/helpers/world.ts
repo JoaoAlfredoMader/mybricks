@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import { loadEnv } from "../../src/config/env.js";
 import { createContainer } from "../../src/container.js";
+import { auditLogs, members, organizations, users, verifications } from "../../src/db/schema.js";
 
 /**
  * The real app wired against the test database, called in-process (no network). Guests start with
@@ -8,14 +10,18 @@ import { createContainer } from "../../src/container.js";
  */
 export const env = loadEnv();
 const container = createContainer(env, { withoutDemoData: true });
-export const { prisma, app, storage, auth } = container;
+export const { db, app, storage, auth, close } = container;
 
 /** Wipes users, organizations and everything that hangs from them. Reference data is kept. */
 export async function resetDatabase(): Promise<void> {
-  const [row] = await prisma.$queryRaw<{ current_database: string }[]>`SELECT current_database()`;
-  const name = row?.current_database;
-  if (!name?.endsWith("_test")) throw new Error(`Refusing to truncate "${name}": not a test database`);
-  await prisma.$executeRawUnsafe(`TRUNCATE users, organizations, verifications RESTART IDENTITY CASCADE`);
+  if (!env.DATABASE_URL.includes("mybricks-test-")) throw new Error(`Refusing to wipe "${env.DATABASE_URL}": not a test database`);
+  // Foreign keys cascade from users and organizations to everything else, except the audit trail of
+  // platform-level events (no organization), which is cleared on its own.
+  await db.delete(auditLogs);
+  await db.delete(organizations);
+  await db.delete(users);
+  await db.delete(verifications);
+  await db.run(sql`DELETE FROM sqlite_sequence WHERE name = 'audit_logs'`);
 }
 
 export interface ApiResponse {
@@ -136,7 +142,7 @@ export async function signUp(name: string, email: string): Promise<Account> {
 
 /** Makes `member` a plain member of the owner's organization and activates it on their session. */
 export async function joinAsMember(owner: Account, member: Account): Promise<void> {
-  await prisma.member.create({ data: { organizationId: owner.organizationId, userId: member.userId, role: "member" } });
+  await db.insert(members).values({ organizationId: owner.organizationId, userId: member.userId, role: "member" });
   const response = await member.session.call("POST", "/api/auth/organization/set-active", {
     organizationId: owner.organizationId,
   });

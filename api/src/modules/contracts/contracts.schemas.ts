@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AdjustmentIndex, ContractStatus, ContractType } from "../../generated/prisma/enums.js";
+import { AdjustmentIndex, ContractStatus, ContractType } from "../../db/enums.js";
 import { optionalText } from "../../shared/validation/optional-text.js";
 import { occupantInputSchema } from "../occupants/occupant-input.js";
 

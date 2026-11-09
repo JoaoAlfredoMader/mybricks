@@ -1,6 +1,12 @@
+import { type SQL, and, count, eq } from "drizzle-orm";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { afterAll, beforeAll, describe, it } from "vitest";
+import { members, occupants, reservations } from "../../src/db/schema.js";
 import { check } from "../helpers/check.js";
-import { type ApiResponse, Session, prisma, resetDatabase, signUp } from "../helpers/world.js";
+import { type ApiResponse, Session, close, db, resetDatabase, signUp } from "../helpers/world.js";
+
+/** Number of rows of a table that match the condition. */
+const countRows = async (table: SQLiteTable, where?: SQL) => (await db.select({ value: count() }).from(table).where(where))[0]!.value;
 
 const CPF_1 = "529.982.247-25";
 const CPF_2 = "168.995.350-09";
@@ -15,7 +21,7 @@ describe("Reservations API", () => {
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   beforeAll(resetDatabase);
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("sets up the scenario", async () => {
     const anon = new Session();
@@ -24,7 +30,7 @@ describe("Reservations API", () => {
     ana = await signUp("Ana Souza", "ana@example.com");
     bia = await signUp("Bia Lima", "bia@example.com");
     carlos = await signUp("Carlos Dias", "carlos@example.com");
-    await prisma.member.create({ data: { organizationId: ana.organizationId, userId: bia.userId, role: "member" } });
+    await db.insert(members).values({ organizationId: ana.organizationId, userId: bia.userId, role: "member" });
     await bia.session.call("POST", "/api/auth/organization/set-active", { organizationId: ana.organizationId });
 
     const mkProperty = async (who: typeof ana, name: string, usageType: string, rentalMode = "manual") => {
@@ -83,7 +89,7 @@ describe("Reservations API", () => {
     await bad("non-uuid property -> 400", { ...base, propertyId: "x" });
     await bad("invalid guest document -> 400", { ...base, checkIn: "2026-05-01", checkOut: "2026-05-02", occupant: { name: "Fulano", document: "123.456.789-00" } });
     await bad("unknown guest id -> 400", { ...base, checkIn: "2026-05-01", checkOut: "2026-05-02", occupant: undefined, occupantId: "00000000-0000-4000-8000-000000000000" }, "occupantId");
-    check("failed creates left nothing behind", (await prisma.reservation.count()) === 2 && (await prisma.occupant.count({ where: { name: "Fulano" } })) === 0);
+    check("failed creates left nothing behind", (await countRows(reservations)) === 2 && (await countRows(occupants, eq(occupants.name, "Fulano"))) === 0);
   });
 
   it("business rules", async () => {
@@ -117,13 +123,13 @@ describe("Reservations API", () => {
     const racers = await Promise.all([1, 2, 3].map((n) =>
       ana.session.call("POST", "/api/reservations", { ...base, checkIn: "2026-08-01", checkOut: "2026-08-05", occupant: { name: `Corredor ${n}` } })));
     check("concurrent bookings: exactly one wins, the rest get 409", racers.filter((r) => r.status === 201).length === 1 && racers.filter((r) => r.status === 409).length === 2, racers.map((r) => [r.status, r.json?.error?.code]));
-    check("concurrent bookings: one confirmed reservation in the database", (await prisma.reservation.count({ where: { propertyId: flat, checkIn: new Date("2026-08-01"), status: "confirmed" } })) === 1);
+    check("concurrent bookings: one confirmed reservation in the database", (await countRows(reservations, and(eq(reservations.propertyId, flat), eq(reservations.checkIn, new Date("2026-08-01")), eq(reservations.status, "confirmed")))) === 1);
   });
 
   it("guest reuse", async () => {
     const sameDoc = await ana.session.call("POST", "/api/reservations", { ...base, checkIn: "2026-09-01", checkOut: "2026-09-03", occupant: { name: "Outro Nome", document: CPF_1 } });
     check("a known document reuses the stored guest", sameDoc.status === 201 && sameDoc.json.guest.id === r1.guest.id && sameDoc.json.guest.name === "Hóspede Um", sameDoc);
-    check("one occupant row per document", (await prisma.occupant.count({ where: { document: "52998224725" } })) === 1);
+    check("one occupant row per document", (await countRows(occupants, eq(occupants.document, "52998224725"))) === 1);
     const foreign = await carlos.session.call("POST", "/api/reservations", { propertyId: carlosFlat, checkIn: "2026-03-10", checkOut: "2026-03-12", occupant: undefined, occupantId: r1.guest.id });
     check("another organization's guest id is refused (400)", foreign.status === 400, foreign);
   });
@@ -205,7 +211,7 @@ describe("Reservations API", () => {
       (await bia.session.call("POST", `/api/reservations/${r1.id}/cancel`)).status === 404);
     const biaGuests = await bia.session.call("GET", "/api/occupants");
     check("member sees the guests of her reservations", biaGuests.json?.total === 1 && biaGuests.json.items[0].name === "Hóspede da Bia", biaGuests.json);
-    check("owner sees every reservation", (await ana.session.call("GET", "/api/reservations?pageSize=100")).json?.total === (await prisma.reservation.count({ where: { organizationId: ana.organizationId } })));
+    check("owner sees every reservation", (await ana.session.call("GET", "/api/reservations?pageSize=100")).json?.total === (await countRows(reservations, eq(reservations.organizationId, ana.organizationId))));
   });
 
   it("tenant isolation", async () => {
@@ -219,6 +225,6 @@ describe("Reservations API", () => {
   });
 
   it("property deletion", async () => {
-    check("deleting the property removes its reservations", (await ana.session.call("DELETE", `/api/properties/${flat2}`)).status === 204 && (await prisma.reservation.count({ where: { propertyId: flat2 } })) === 0);
+    check("deleting the property removes its reservations", (await ana.session.call("DELETE", `/api/properties/${flat2}`)).status === 204 && (await countRows(reservations, eq(reservations.propertyId, flat2))) === 0);
   });
 });

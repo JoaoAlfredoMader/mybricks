@@ -1,4 +1,4 @@
-import type { AcquisitionType, PropertyType, RentalMode, UsageType } from "../../generated/prisma/enums.js";
+import type { AcquisitionType, PropertyType, RentalMode, UsageType } from "../../db/enums.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import type { TenantScope } from "../../shared/http/tenant.js";
 import { centsToNumber, numberToCents } from "../../shared/money.js";
@@ -363,7 +363,7 @@ export function createPropertiesService(repository: PropertiesRepository): Prope
       const terms: FinancingTerms = {
         financedAmountCents: centsToNumber(financing.financedAmountCents),
         termMonths: financing.termMonths,
-        annualInterestRate: financing.annualInterestRate.toNumber(),
+        annualInterestRate: financing.annualInterestRate,
         amortizationSystem: financing.amortizationSystem,
         firstInstallmentOn: financing.firstInstallmentOn.toISOString().slice(0, 10),
       };

@@ -11,7 +11,7 @@ import type {
   RentalMode,
   ReservationStatus,
   UsageType,
-} from "../../generated/prisma/enums.js";
+} from "../../db/enums.js";
 
 /**
  * The sample portfolio a guest gets to play with. It is built from "today", so there is always a

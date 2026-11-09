@@ -1,4 +1,4 @@
-import type { ReservationStatus } from "../../generated/prisma/enums.js";
+import type { ReservationStatus } from "../../db/enums.js";
 import { centsToNumber } from "../../shared/money.js";
 import type { ReservationRecord } from "./reservations.repository.js";
 

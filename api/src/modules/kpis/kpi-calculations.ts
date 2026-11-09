@@ -1,4 +1,4 @@
-import type { UsageType } from "../../generated/prisma/enums.js";
+import type { UsageType } from "../../db/enums.js";
 
 /**
  * Pure portfolio maths: no database, no HTTP. Amounts are integer cents (as numbers),

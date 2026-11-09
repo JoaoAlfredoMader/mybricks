@@ -1,4 +1,4 @@
-import type { PersonType } from "../../generated/prisma/enums.js";
+import type { PersonType } from "../../db/enums.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import type { TenantScope } from "../../shared/http/tenant.js";
 import { isValidCnpj, isValidCpf } from "../../shared/validation/brazilian-document.js";
@@ -33,7 +33,7 @@ function assertDocumentMatchesPersonType(personType: PersonType, document: strin
   }
 }
 
-/** Service layer: business rules. No HTTP, no Prisma. */
+/** Service layer: business rules. No HTTP, no database. */
 export function createClientsService(repository: ClientsRepository): ClientsService {
   return {
     async list(tenant, { page, pageSize, search, personType }) {

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { requireAuth } from "../../shared/http/auth.middleware.js";
 import { validate } from "../../shared/http/validate.js";
@@ -20,8 +20,8 @@ export const searchCitiesQuerySchema = z.object({
 });
 
 /** Route layer: read-only reference data for the forms. */
-export function createLookupsRoutes(prisma: PrismaClient) {
-  const controller = createLookupsController(createLookupsService(createLookupsRepository(prisma)));
+export function createLookupsRoutes(db: Database) {
+  const controller = createLookupsController(createLookupsService(createLookupsRepository(db)));
 
   return new Hono<AppEnv>()
     .use(requireAuth)

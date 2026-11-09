@@ -1,6 +1,22 @@
+import { type SQL, count, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { check } from "../helpers/check.js";
-import { type ApiResponse, Session, prisma, resetDatabase, signUp } from "../helpers/world.js";
+import { type ApiResponse, Session, close, db, resetDatabase, signUp } from "../helpers/world.js";
+import {
+  contractRentTerms,
+  contracts,
+  members,
+  occupants,
+  properties,
+  propertyAddresses,
+  propertyFinancings,
+  propertyInsurances,
+  propertyLegalRecords,
+  propertyManualRentals,
+} from "../../src/db/schema.js";
+
+type Table = typeof properties | typeof propertyAddresses | typeof propertyFinancings | typeof propertyInsurances | typeof propertyLegalRecords | typeof propertyManualRentals | typeof contracts;
+const countWhere = async (table: Table, where: SQL) => (await db.select({ value: count() }).from(table).where(where))[0]!.value;
 
 
 
@@ -14,7 +30,7 @@ describe("Properties API", () => {
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   beforeAll(resetDatabase);
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("sets up the scenario", async () => {
     const anon = new Session();
@@ -24,7 +40,7 @@ describe("Properties API", () => {
     ana = await signUp("Ana Souza", "ana@example.com");
     bia = await signUp("Bia Lima", "bia@example.com");
     carlos = await signUp("Carlos Dias", "carlos@example.com");
-    await prisma.member.create({ data: { organizationId: ana.organizationId, userId: bia.userId, role: "member" } });
+    await db.insert(members).values({ organizationId: ana.organizationId, userId: bia.userId, role: "member" });
     await bia.session.call("POST", "/api/auth/organization/set-active", { organizationId: ana.organizationId });
   });
 
@@ -75,7 +91,7 @@ describe("Properties API", () => {
       apto?.address?.city === "Campinas" && apto.address.state === "SP" && apto.address.postalCode === "13015-904" && apto.address.complement === null, apto?.address);
     check("manual rental with tenant -> rented", apto?.status === "rented" && apto.manualRental.dueDay === 5, apto);
     check("client attached", apto?.clientId === clientAna.id, apto);
-    stored = await prisma.property.findUnique({ where: { id: apto.id } });
+    stored = (await db.select().from(properties).where(eq(properties.id, apto.id)))[0];
     check("stored in the caller's organization", stored?.organizationId === ana.organizationId);
 
     const ownUse = await ana.session.call("POST", "/api/properties", {
@@ -121,7 +137,7 @@ describe("Properties API", () => {
     await bad("manual rental in contract mode -> 400", { ...base, rentalMode: "contract", manualRental: { monthlyRentCents: 1 } }, "manualRental");
     await bad("due day 32 -> 400", { ...base, manualRental: { dueDay: 32 } });
     await bad("unknown property type -> 400", { ...base, propertyType: "castle" });
-    check("failed creates left nothing behind", (await prisma.property.count({ where: { name: "Teste" } })) === 0);
+    check("failed creates left nothing behind", (await countWhere(properties, eq(properties.name, "Teste"))) === 0);
   });
 
   it("list", async () => {
@@ -170,15 +186,18 @@ describe("Properties API", () => {
     // contract mode: status follows the active contract
     const toContract = await ana.session.call("PATCH", `/api/properties/${apto.id}`, { rentalMode: "contract" });
     check("contract mode without an active contract -> vacant", toContract.status === 200 && toContract.json.status === "vacant", toContract);
-    const occupant = await prisma.occupant.create({ data: { organizationId: ana.organizationId, name: "Locatário Contrato" } });
-    contract = await prisma.contract.create({
-      data: {
-        organizationId: ana.organizationId, propertyId: apto.id, occupantId: occupant.id, contractType: "conventional",
-        startDate: new Date("2026-01-01"), rentTerms: { create: { monthlyRentCents: 500_000n, dueDay: 5 } },
-      },
-    });
+    const [occupant] = await db.insert(occupants).values({ organizationId: ana.organizationId, name: "Locatário Contrato" }).returning();
+    const contractId = crypto.randomUUID();
+    await db.batch([
+      db.insert(contracts).values({
+        id: contractId, organizationId: ana.organizationId, propertyId: apto.id, occupantId: occupant!.id, contractType: "conventional",
+        startDate: new Date("2026-01-01"),
+      }),
+      db.insert(contractRentTerms).values({ contractId, contractType: "conventional", monthlyRentCents: 500_000n, dueDay: 5 }),
+    ]);
+    contract = { id: contractId };
     check("active contract -> rented", (await ana.session.call("GET", `/api/properties/${apto.id}`)).json?.status === "rented");
-    await prisma.contract.update({ where: { id: contract.id }, data: { status: "ended" } });
+    await db.update(contracts).set({ status: "ended" }).where(eq(contracts.id, contract.id));
     check("ended contract -> vacant again", (await ana.session.call("GET", `/api/properties/${apto.id}`)).json?.status === "vacant");
     const contractWithRental = await ana.session.call("PATCH", `/api/properties/${apto.id}`, { manualRental: { monthlyRentCents: 1 } });
     check("sending manual rental while in contract mode -> 400", contractWithRental.status === 400, contractWithRental);
@@ -213,7 +232,7 @@ describe("Properties API", () => {
       financed?.financing?.lender === "Caixa" && financed.financing.financedAmountCents === 40_000_000 && financed.financing.termMonths === 360 && financed.financing.annualInterestRate === 10.5 && financed.financing.amortizationSystem === "sac" && financed.financing.firstInstallmentOn === "2020-05-10", financed?.financing);
     check("legal record exposed, blank notes become null", financed?.legalRecord?.registrationStatus === "irregular" && financed.legalRecord.irregularityDescription === "Sem habite-se" && financed.legalRecord.registryNumber === "12.345" && financed.legalRecord.notes === null, financed?.legalRecord);
     check("insurance exposed", financed?.insurance?.description === "Apólice 99 - Porto Seguro", financed?.insurance);
-    check("the financing mirrors the acquisition type in the database", (await prisma.propertyFinancing.findUnique({ where: { propertyId: financed.id } }))?.acquisitionType === "purchase");
+    check("the financing mirrors the acquisition type in the database", (await db.select().from(propertyFinancings).where(eq(propertyFinancings.propertyId, financed.id)))[0]?.acquisitionType === "purchase");
 
     const base = { name: "Teste", propertyType: "residential", usageType: "rental" };
     const bad = async (name: string, body: unknown, path: string) => {
@@ -229,7 +248,7 @@ describe("Properties API", () => {
     await bad("negative rate -> 400", { ...purchase, financing: { ...financing, annualInterestRate: -1 } }, "financing.annualInterestRate");
     await bad("unknown amortization system -> 400", { ...purchase, financing: { ...financing, amortizationSystem: "bullet" } }, "financing.amortizationSystem");
     await bad("impossible first installment date -> 400", { ...purchase, financing: { ...financing, firstInstallmentOn: "2020-02-30" } }, "financing.firstInstallmentOn");
-    check("failed creates left nothing behind", (await prisma.property.count({ where: { name: "Teste" } })) === 0);
+    check("failed creates left nothing behind", (await countWhere(properties, eq(properties.name, "Teste"))) === 0);
 
     const defaults = await ana.session.call("POST", "/api/properties", { ...base, name: "Registro padrão", legalRecord: {} });
     check("a legal record defaults to regular", defaults.json?.legalRecord?.registrationStatus === "regular" && defaults.json.legalRecord.irregularityDescription === null, defaults);
@@ -240,7 +259,7 @@ describe("Properties API", () => {
     check("financing is replaced as a whole", price.json?.financing?.amortizationSystem === "price" && price.json.financing.annualInterestRate === 9, price);
     const construction = await ana.session.call("PATCH", `/api/properties/${financed.id}`, { acquisition: { acquisitionType: "construction", acquiredOn: "2020-03-15", costCents: 60_000_000 } });
     check("switching purchase to construction keeps the financing", construction.status === 200 && construction.json.acquisition.acquisitionType === "construction" && construction.json.financing?.amortizationSystem === "price", construction);
-    check("the mirrored type followed in the database", (await prisma.propertyFinancing.findUnique({ where: { propertyId: financed.id } }))?.acquisitionType === "construction");
+    check("the mirrored type followed in the database", (await db.select().from(propertyFinancings).where(eq(propertyFinancings.propertyId, financed.id)))[0]?.acquisitionType === "construction");
     const toInheritance = await ana.session.call("PATCH", `/api/properties/${financed.id}`, { acquisition: { acquisitionType: "inheritance", acquiredOn: "2018-01-10" } });
     check("switching to inheritance while financed -> 400", toInheritance.status === 400 && toInheritance.json.error.details.some((d: any) => d.path === "financing"), toInheritance);
     const dropAcquisition = await ana.session.call("PATCH", `/api/properties/${financed.id}`, { acquisition: null });
@@ -260,7 +279,7 @@ describe("Properties API", () => {
     const insured = await ana.session.call("PATCH", `/api/properties/${noExtras.json.id}`, { insurance: { description: "" } });
     check("an insurance without a description still means insured", insured.json?.insurance !== null && insured.json.insurance.description === null, insured.json);
     check("insurance can be removed", (await ana.session.call("PATCH", `/api/properties/${noExtras.json.id}`, { insurance: null })).json?.insurance === null);
-    check("deleting the property removes the extras", (await ana.session.call("DELETE", `/api/properties/${financed.id}`)).status === 204 && (await prisma.propertyFinancing.count({ where: { propertyId: financed.id } })) + (await prisma.propertyLegalRecord.count({ where: { propertyId: financed.id } })) + (await prisma.propertyInsurance.count({ where: { propertyId: financed.id } })) === 0);
+    check("deleting the property removes the extras", (await ana.session.call("DELETE", `/api/properties/${financed.id}`)).status === 204 && (await countWhere(propertyFinancings, eq(propertyFinancings.propertyId, financed.id))) + (await countWhere(propertyLegalRecords, eq(propertyLegalRecords.propertyId, financed.id))) + (await countWhere(propertyInsurances, eq(propertyInsurances.propertyId, financed.id))) === 0);
   });
 
   it("members only see what they created", async () => {
@@ -273,7 +292,7 @@ describe("Properties API", () => {
     check("member cannot delete it (404)", (await bia.session.call("DELETE", `/api/properties/${apto.id}`)).status === 404);
     const biaWithAnaClient = await bia.session.call("POST", "/api/properties", { name: "Teste Bia", propertyType: "residential", usageType: "rental", clientId: clientAna.id });
     check("member cannot attach a client she cannot see -> 400", biaWithAnaClient.status === 400, biaWithAnaClient);
-    check("owner sees everything", (await ana.session.call("GET", "/api/properties")).json?.total === (await prisma.property.count({ where: { organizationId: ana.organizationId } })));
+    check("owner sees everything", (await ana.session.call("GET", "/api/properties")).json?.total === (await countWhere(properties, eq(properties.organizationId, ana.organizationId))));
   });
 
   it("tenant isolation", async () => {
@@ -281,7 +300,7 @@ describe("Properties API", () => {
     check("other organization cannot update (404)", (await carlos.session.call("PATCH", `/api/properties/${apto.id}`, { name: "Hack Hack" })).status === 404);
     check("other organization cannot delete (404)", (await carlos.session.call("DELETE", `/api/properties/${apto.id}`)).status === 404);
     check("other organization lists nothing of ours", (await carlos.session.call("GET", "/api/properties")).json?.total === 0);
-    check("property untouched after cross-tenant attempts", (await prisma.property.findUnique({ where: { id: apto.id } }))?.name === "Apto 42 B");
+    check("property untouched after cross-tenant attempts", (await db.select().from(properties).where(eq(properties.id, apto.id)))[0]?.name === "Apto 42 B");
   });
 
   it("client deletion is blocked by properties, then released", async () => {
@@ -299,9 +318,9 @@ describe("Properties API", () => {
     check("deleted property is gone (404)", (await ana.session.call("GET", `/api/properties/${apto.id}`)).status === 404);
     check("delete twice -> 404", (await ana.session.call("DELETE", `/api/properties/${apto.id}`)).status === 404);
     const orphans =
-      (await prisma.propertyAddress.count({ where: { propertyId: apto.id } })) +
-      (await prisma.propertyManualRental.count({ where: { propertyId: apto.id } })) +
-      (await prisma.contract.count({ where: { propertyId: apto.id } }));
+      (await countWhere(propertyAddresses, eq(propertyAddresses.propertyId, apto.id))) +
+      (await countWhere(propertyManualRentals, eq(propertyManualRentals.propertyId, apto.id))) +
+      (await countWhere(contracts, eq(contracts.propertyId, apto.id)));
     check("children were deleted with the property", orphans === 0, orphans);
   });
 });

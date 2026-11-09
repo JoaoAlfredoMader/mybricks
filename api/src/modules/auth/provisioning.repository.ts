@@ -1,4 +1,7 @@
-import type { PrismaClient } from "../../lib/prisma.js";
+import { and, asc, count, eq, inArray } from "drizzle-orm";
+import { atomic } from "../../db/atomic.js";
+import type { Database } from "../../db/database.js";
+import { clients, members, occupants, organizations, properties, sessions, storedFiles } from "../../db/schema.js";
 
 export interface NewOrganization {
   name: string;
@@ -23,71 +26,79 @@ export interface ProvisioningRepository {
   adoptDemoOrganization(input: { anonymousUserId: string; newUserId: string; organizationName: string }): Promise<string | null>;
 }
 
-/** Repository layer: the only place of the auth module that talks to Prisma. */
-export function createProvisioningRepository(prisma: PrismaClient): ProvisioningRepository {
+/** Repository layer: the only place of the auth module that talks to the database. */
+export function createProvisioningRepository(db: Database): ProvisioningRepository {
   return {
     async createOrganizationWithOwner({ name, slug, ownerId, isDemo, demoExpiresAt }) {
-      const organization = await prisma.organization.create({
-        data: { name, slug, isDemo, demoExpiresAt, members: { create: { userId: ownerId, role: "owner" } } },
-        select: { id: true },
-      });
-      return organization;
+      const id = crypto.randomUUID();
+      // One batch: an organization is never left without its owner.
+      await atomic(db, [
+        db.insert(organizations).values({ id, name, slug, isDemo, demoExpiresAt }),
+        db.insert(members).values({ organizationId: id, userId: ownerId, role: "owner" }),
+      ]);
+      return { id };
     },
 
     async findFirstOrganizationId(userId) {
-      const membership = await prisma.member.findFirst({
-        where: { userId },
-        orderBy: { createdAt: "asc" },
-        select: { organizationId: true },
-      });
+      const [membership] = await db
+        .select({ organizationId: members.organizationId })
+        .from(members)
+        .where(eq(members.userId, userId))
+        .orderBy(asc(members.createdAt))
+        .limit(1);
       return membership?.organizationId ?? null;
     },
 
     async findMemberRole(organizationId, userId) {
-      const membership = await prisma.member.findUnique({
-        where: { organizationId_userId: { organizationId, userId } },
-        select: { role: true },
-      });
+      const [membership] = await db
+        .select({ role: members.role })
+        .from(members)
+        .where(and(eq(members.organizationId, organizationId), eq(members.userId, userId)));
       return membership?.role ?? null;
     },
 
     async setActiveOrganizationForSessions(userId, organizationId) {
-      await prisma.session.updateMany({ where: { userId }, data: { activeOrganizationId: organizationId } });
+      await db.update(sessions).set({ activeOrganizationId: organizationId }).where(eq(sessions.userId, userId));
     },
 
     async adoptDemoOrganization({ anonymousUserId, newUserId, organizationName }) {
-      return prisma.$transaction(async (tx) => {
-        const demo = await tx.member.findFirst({
-          where: { userId: anonymousUserId, organization: { isDemo: true } },
-          orderBy: { createdAt: "asc" },
-          select: { organizationId: true },
-        });
-        if (!demo) return null;
+      const [demo] = await db
+        .select({ organizationId: members.organizationId })
+        .from(members)
+        .innerJoin(organizations, eq(organizations.id, members.organizationId))
+        .where(and(eq(members.userId, anonymousUserId), eq(organizations.isDemo, true)))
+        .orderBy(asc(members.createdAt))
+        .limit(1);
+      if (!demo) return null;
 
-        const personal = await tx.member.findMany({
-          where: { userId: newUserId, role: "owner", organization: { isDemo: false } },
-          select: { organizationId: true },
-        });
-        for (const { organizationId } of personal) {
-          const [properties, clients, occupants, files] = await Promise.all([
-            tx.property.count({ where: { organizationId } }),
-            tx.client.count({ where: { organizationId } }),
-            tx.occupant.count({ where: { organizationId } }),
-            tx.storedFile.count({ where: { organizationId } }),
-          ]);
-          if (properties + clients + occupants + files === 0) {
-            await tx.organization.delete({ where: { id: organizationId } });
-          }
-        }
+      // The new user's own personal organizations that are still empty are dropped.
+      const personal = await db
+        .select({ organizationId: members.organizationId })
+        .from(members)
+        .innerJoin(organizations, eq(organizations.id, members.organizationId))
+        .where(and(eq(members.userId, newUserId), eq(members.role, "owner"), eq(organizations.isDemo, false)));
+      const empty: string[] = [];
+      for (const { organizationId } of personal) {
+        const counts = await Promise.all(
+          [properties, clients, occupants, storedFiles].map(async (table) => {
+            const [row] = await db.select({ value: count() }).from(table).where(eq(table.organizationId, organizationId));
+            return row?.value ?? 0;
+          }),
+        );
+        if (counts.every((value) => value === 0)) empty.push(organizationId);
+      }
 
-        await tx.member.updateMany({ where: { userId: anonymousUserId }, data: { userId: newUserId } });
-        await tx.organization.update({
-          where: { id: demo.organizationId },
-          data: { isDemo: false, demoExpiresAt: null, name: organizationName },
-        });
-        await tx.session.updateMany({ where: { userId: newUserId }, data: { activeOrganizationId: demo.organizationId } });
-        return demo.organizationId;
-      });
+      // The reads above are outside the batch: nothing else touches a brand-new account in between.
+      await atomic(db, [
+        db.delete(organizations).where(inArray(organizations.id, empty.length ? empty : [""])),
+        db.update(members).set({ userId: newUserId }).where(eq(members.userId, anonymousUserId)),
+        db
+          .update(organizations)
+          .set({ isDemo: false, demoExpiresAt: null, name: organizationName })
+          .where(eq(organizations.id, demo.organizationId)),
+        db.update(sessions).set({ activeOrganizationId: demo.organizationId }).where(eq(sessions.userId, newUserId)),
+      ]);
+      return demo.organizationId;
     },
   };
 }

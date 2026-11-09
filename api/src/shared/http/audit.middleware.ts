@@ -1,5 +1,5 @@
 import type { Context, MiddlewareHandler } from "hono";
-import type { AuditAction, AuditEntityType } from "../../generated/prisma/enums.js";
+import type { AuditAction, AuditEntityType } from "../../db/enums.js";
 import { clientIp } from "../../modules/audit/audit.recorder.js";
 import type { AppEnv } from "./app-env.js";
 

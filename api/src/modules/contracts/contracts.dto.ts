@@ -1,4 +1,4 @@
-import type { AdjustmentIndex, ContractStatus, ContractType } from "../../generated/prisma/enums.js";
+import type { AdjustmentIndex, ContractStatus, ContractType } from "../../db/enums.js";
 import { centsToNumber } from "../../shared/money.js";
 import type { ContractRecord } from "./contracts.repository.js";
 

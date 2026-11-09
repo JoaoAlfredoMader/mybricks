@@ -1,15 +1,15 @@
-import type { Prisma } from "../../generated/prisma/client.js";
-import type { PrismaClient } from "../../lib/prisma.js";
+import { type SQL, and, asc, count, eq, inArray, sql } from "drizzle-orm";
+import { atomic } from "../../db/atomic.js";
+import type { Database } from "../../db/database.js";
+import { properties, propertyPhotos, storedFiles } from "../../db/schema.js";
 
-const select = {
-  id: true,
-  propertyId: true,
-  position: true,
-  createdAt: true,
-  file: { select: { storageKey: true, fileName: true, mimeType: true, sizeBytes: true } },
-} satisfies Prisma.PropertyPhotoSelect;
-
-export type PhotoRecord = Prisma.PropertyPhotoGetPayload<{ select: typeof select }>;
+export interface PhotoRecord {
+  id: string;
+  propertyId: string;
+  position: number;
+  createdAt: Date;
+  file: { storageKey: string; fileName: string; mimeType: string; sizeBytes: bigint };
+}
 
 /** Photos belong to a property: members only reach those of properties they created. */
 export interface PhotoScope {
@@ -38,84 +38,100 @@ export interface PhotosRepository {
   delete(scope: PhotoScope, propertyId: string, id: string): Promise<{ storageKey: string } | null>;
 }
 
-function whereFor(scope: PhotoScope, propertyId: string): Prisma.PropertyPhotoWhereInput {
-  return {
-    propertyId,
-    property: {
-      organizationId: scope.organizationId,
-      ...(scope.propertyCreatedById ? { createdById: scope.propertyCreatedById } : {}),
-    },
-  };
-}
+/** Repository layer: the only place that talks to the database. */
+export function createPhotosRepository(db: Database): PhotosRepository {
+  const propertyScope = (scope: PhotoScope): SQL =>
+    and(
+      eq(properties.organizationId, scope.organizationId),
+      scope.propertyCreatedById ? eq(properties.createdById, scope.propertyCreatedById) : undefined,
+    ) as SQL;
 
-/** Repository layer: the only place that talks to Prisma. */
-export function createPhotosRepository(prisma: PrismaClient): PhotosRepository {
+  /** A photo is visible when its property is. */
+  const whereFor = (scope: PhotoScope, propertyId: string): SQL =>
+    and(
+      eq(propertyPhotos.propertyId, propertyId),
+      inArray(propertyPhotos.propertyId, db.select({ id: properties.id }).from(properties).where(propertyScope(scope))),
+    ) as SQL;
+
+  async function load(where: SQL): Promise<PhotoRecord[]> {
+    const rows = await db
+      .select({
+        id: propertyPhotos.id,
+        propertyId: propertyPhotos.propertyId,
+        position: propertyPhotos.position,
+        createdAt: propertyPhotos.createdAt,
+        storageKey: storedFiles.storageKey,
+        fileName: storedFiles.fileName,
+        mimeType: storedFiles.mimeType,
+        sizeBytes: storedFiles.sizeBytes,
+      })
+      .from(propertyPhotos)
+      .innerJoin(storedFiles, eq(storedFiles.id, propertyPhotos.fileId))
+      .where(where)
+      .orderBy(asc(propertyPhotos.position), asc(propertyPhotos.createdAt), asc(propertyPhotos.id));
+    return rows.map(({ storageKey, fileName, mimeType, sizeBytes, ...photo }) => ({
+      ...photo,
+      file: { storageKey, fileName, mimeType, sizeBytes },
+    }));
+  }
+
   return {
     async propertyVisible(scope, propertyId) {
-      const count = await prisma.property.count({
-        where: {
-          id: propertyId,
-          organizationId: scope.organizationId,
-          ...(scope.propertyCreatedById ? { createdById: scope.propertyCreatedById } : {}),
-        },
-      });
-      return count > 0;
+      const [row] = await db.select({ id: properties.id }).from(properties).where(and(propertyScope(scope), eq(properties.id, propertyId)));
+      return row !== undefined;
     },
 
-    count(scope, propertyId) {
-      return prisma.propertyPhoto.count({ where: whereFor(scope, propertyId) });
+    async count(scope, propertyId) {
+      const [row] = await db.select({ value: count() }).from(propertyPhotos).where(whereFor(scope, propertyId));
+      return row?.value ?? 0;
     },
 
     list(scope, propertyId) {
-      return prisma.propertyPhoto.findMany({
-        where: whereFor(scope, propertyId),
-        select,
-        orderBy: [{ position: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-      });
+      return load(whereFor(scope, propertyId));
     },
 
-    findById(scope, propertyId, id) {
-      return prisma.propertyPhoto.findFirst({ where: { ...whereFor(scope, propertyId), id }, select });
+    async findById(scope, propertyId, id) {
+      return (await load(and(whereFor(scope, propertyId), eq(propertyPhotos.id, id)) as SQL))[0] ?? null;
     },
 
-    create(scope, propertyId, file) {
-      return prisma.$transaction(async (tx) => {
-        const last = await tx.propertyPhoto.aggregate({ where: { propertyId }, _max: { position: true } });
-        const stored = await tx.storedFile.create({
-          data: { ...file, organizationId: scope.organizationId, sizeBytes: BigInt(file.sizeBytes) },
-          select: { id: true },
-        });
-        return tx.propertyPhoto.create({
-          data: {
-            organizationId: scope.organizationId,
-            propertyId,
-            fileId: stored.id,
-            position: (last._max.position ?? -1) + 1,
-          },
-          select,
-        });
-      });
+    async create(scope, propertyId, file) {
+      const fileId = crypto.randomUUID();
+      const photoId = crypto.randomUUID();
+      // The stored file and the photo go in ONE batch. The position is computed by the statement itself
+      // (end of the property's photos), so no read has to sit between the two writes.
+      await atomic(db, [
+        db.insert(storedFiles).values({ ...file, id: fileId, organizationId: scope.organizationId, sizeBytes: BigInt(file.sizeBytes) }),
+        db.insert(propertyPhotos).values({
+          id: photoId,
+          organizationId: scope.organizationId,
+          propertyId,
+          fileId,
+          position: sql<number>`(select coalesce(max(${propertyPhotos.position}), -1) + 1 from ${propertyPhotos} where ${propertyPhotos.propertyId} = ${propertyId})`,
+        }),
+      ]);
+      const [created] = await load(eq(propertyPhotos.id, photoId));
+      if (!created) throw new Error("The photo that was just created could not be read back");
+      return created;
     },
 
     async reorder(scope, propertyId, orderedIds) {
-      await prisma.$transaction(
-        orderedIds.map((id, position) =>
-          prisma.propertyPhoto.updateMany({ where: { ...whereFor(scope, propertyId), id }, data: { position } }),
-        ),
+      const [first, ...rest] = orderedIds.map((id, position) =>
+        db.update(propertyPhotos).set({ position }).where(and(whereFor(scope, propertyId), eq(propertyPhotos.id, id))),
       );
+      if (!first) return;
+      await atomic(db, [first, ...rest]);
     },
 
-    delete(scope, propertyId, id) {
-      return prisma.$transaction(async (tx) => {
-        const photo = await tx.propertyPhoto.findFirst({
-          where: { ...whereFor(scope, propertyId), id },
-          select: { fileId: true, file: { select: { storageKey: true } } },
-        });
-        if (!photo) return null;
-        await tx.propertyPhoto.delete({ where: { id } });
-        await tx.storedFile.delete({ where: { id: photo.fileId } });
-        return { storageKey: photo.file.storageKey };
-      });
+    async delete(scope, propertyId, id) {
+      const [photo] = await db
+        .select({ fileId: propertyPhotos.fileId, storageKey: storedFiles.storageKey })
+        .from(propertyPhotos)
+        .innerJoin(storedFiles, eq(storedFiles.id, propertyPhotos.fileId))
+        .where(and(whereFor(scope, propertyId), eq(propertyPhotos.id, id)));
+      if (!photo) return null;
+      // The photo goes before its file (the foreign key would refuse the opposite order); both or neither.
+      await atomic(db, [db.delete(propertyPhotos).where(eq(propertyPhotos.id, id)), db.delete(storedFiles).where(eq(storedFiles.id, photo.fileId))]);
+      return { storageKey: photo.storageKey };
     },
   };
 }

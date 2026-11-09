@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AmortizationSystem, UsageType } from "../../generated/prisma/enums.js";
+import { AmortizationSystem, UsageType } from "../../db/enums.js";
 import type { CashFlowDto, PortfolioKpisDto, PropertyKpisDto } from "../../modules/kpis/kpis.dto.js";
 import type { FinancingScheduleDto } from "../../modules/properties/properties.dto.js";
 import { cents, date, nullable, output } from "./common.js";

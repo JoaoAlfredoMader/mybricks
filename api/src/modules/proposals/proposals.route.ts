@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { requireAuth } from "../../shared/http/auth.middleware.js";
 import { tenantScope } from "../../shared/http/tenant.js";
@@ -16,8 +16,8 @@ import {
 import { createProposalsService } from "./proposals.service.js";
 
 /** Route layer. Mounted under `/api/properties/:propertyId/proposals`. */
-export function createProposalsRoutes(prisma: PrismaClient) {
-  const controller = createProposalsController(createProposalsService(createProposalsRepository(prisma)));
+export function createProposalsRoutes(db: Database) {
+  const controller = createProposalsController(createProposalsService(createProposalsRepository(db)));
 
   return new Hono<AppEnv>()
     .use(requireAuth)

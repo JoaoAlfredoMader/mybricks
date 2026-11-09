@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PersonType } from "../../generated/prisma/enums.js";
+import { PersonType } from "../../db/enums.js";
 import { normalizeDocument } from "../../shared/validation/brazilian-document.js";
 import { optionalText } from "../../shared/validation/optional-text.js";
 

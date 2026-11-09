@@ -1,4 +1,4 @@
-import type { ProposalType } from "../../generated/prisma/enums.js";
+import type { ProposalType } from "../../db/enums.js";
 import { centsToNumber } from "../../shared/money.js";
 import type { ProposalRecord } from "./proposals.repository.js";
 

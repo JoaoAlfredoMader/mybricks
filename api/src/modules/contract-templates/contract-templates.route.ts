@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { audited } from "../../shared/http/audit.middleware.js";
 import { requireAuth } from "../../shared/http/auth.middleware.js";
@@ -11,9 +11,9 @@ import { updateTemplateSchema } from "./contract-templates.schemas.js";
 import { createContractTemplatesService } from "./contract-templates.service.js";
 
 /** Route layer: the organization's contract template, one per organization. */
-export function createContractTemplatesRoutes(prisma: PrismaClient) {
+export function createContractTemplatesRoutes(db: Database) {
   const controller = createContractTemplatesController(
-    createContractTemplatesService(createContractTemplatesRepository(prisma)),
+    createContractTemplatesService(createContractTemplatesRepository(db)),
   );
 
   return new Hono<AppEnv>()

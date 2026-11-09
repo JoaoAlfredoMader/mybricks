@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { propertySubtypes, propertyTypeUsages, transactionCategories } from "../../prisma/seed/data/catalog.js";
+import { propertySubtypes, propertyTypeUsages, transactionCategories } from "../../src/db/reference-data/catalog.js";
 import { buildDemoPlan, fakeCnpj, fakeCpf } from "../../src/modules/demo/demo-data.js";
 import { isValidCnpj, isValidCpf } from "../../src/shared/validation/brazilian-document.js";
 import { derivePropertyStatus } from "../../src/modules/properties/property-status.js";
 
 const cities = new Set(
-  (JSON.parse(readFileSync("prisma/seed/data/cities.json", "utf8")) as [number, string, string][]).map(([, name, state]) => `${name}/${state}`),
+  (JSON.parse(readFileSync("src/db/reference-data/cities.json", "utf8")) as [number, string, string][]).map(([, name, state]) => `${name}/${state}`),
 );
 const TODAY = new Date("2026-11-03T00:00:00Z");
 const plan = buildDemoPlan(TODAY);

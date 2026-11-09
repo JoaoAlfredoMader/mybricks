@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TransactionType } from "../../generated/prisma/enums.js";
+import { TransactionType } from "../../db/enums.js";
 import { optionalText } from "../../shared/validation/optional-text.js";
 
 /** Calendar date as `YYYY-MM-DD`. ISO dates compare correctly as plain strings. */

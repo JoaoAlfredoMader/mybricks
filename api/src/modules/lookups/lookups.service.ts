@@ -1,4 +1,4 @@
-import type { PropertyType, UsageType } from "../../generated/prisma/enums.js";
+import type { PropertyType, UsageType } from "../../db/enums.js";
 import type { CityRecord, LookupsRepository, TransactionCategoryRecord } from "./lookups.repository.js";
 
 export interface PropertyCatalogEntry {

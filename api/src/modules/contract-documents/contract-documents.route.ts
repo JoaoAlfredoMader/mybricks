@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { StorageProvider } from "../../lib/storage/storage.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { audited } from "../../shared/http/audit.middleware.js";
@@ -16,11 +16,11 @@ import { createContractDocumentsService } from "./contract-documents.service.js"
 export const contractPdfParamSchema = z.object({ id: z.uuid() });
 
 /** Route layer. Mounted under `/api/contracts/:id/pdf`. */
-export function createContractDocumentsRoutes(prisma: PrismaClient, storage: StorageProvider) {
+export function createContractDocumentsRoutes(db: Database, storage: StorageProvider) {
   const controller = createContractDocumentsController(
     createContractDocumentsService(
-      createContractDocumentsRepository(prisma),
-      createContractTemplatesRepository(prisma),
+      createContractDocumentsRepository(db),
+      createContractTemplatesRepository(db),
       storage,
     ),
   );

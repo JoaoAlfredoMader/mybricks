@@ -1,3 +1,4 @@
+import { SQLiteSyncDialect } from "drizzle-orm/sqlite-core";
 import { describe, expect, it } from "vitest";
 import {
   type ListingFacts,
@@ -34,9 +35,9 @@ describe("listing status", () => {
     expect(deriveListingState(facts({ privateArea: null, totalArea: null }))).toEqual({ status: "pending", missing: ["area"] });
   });
 
-  it("accepts either area, in any numeric form", () => {
+  it("accepts either area, as any number", () => {
     expect(listingGaps(facts({ privateArea: null, totalArea: 120 }))).toEqual([]);
-    expect(listingGaps(facts({ privateArea: { toNumber: () => 55.5 }, totalArea: null }))).toEqual([]);
+    expect(listingGaps(facts({ privateArea: 55.5, totalArea: null }))).toEqual([]);
     expect(listingGaps(facts({ privateArea: 0, totalArea: null }))).toEqual([]);
   });
 
@@ -54,12 +55,12 @@ describe("listing status", () => {
 
   it("filters the public query by the same conditions", () => {
     // The agreement with the live status, against real rows, is tested in tests/api/listings.test.ts.
-    const where = liveListingWhere();
-    expect(where.listingPriceCents).toEqual({ not: null });
-    expect(where.listingHiddenAt).toBeNull();
-    expect(where.organization).toEqual({ isDemo: false });
-    expect(where.photos).toEqual({ some: {} });
-    expect(where.address).toBeDefined();
-    expect(where.OR).toHaveLength(2);
+    const { sql: text } = new SQLiteSyncDialect().sqlToQuery(liveListingWhere());
+    expect(text).toContain('"properties"."listing_price_cents" is not null');
+    expect(text).toContain('"properties"."listing_hidden_at" is null');
+    expect(text).toMatch(/"organizations"\."is_demo" = 0/);
+    expect(text).toMatch(/from "property_photos"/);
+    expect(text).toMatch(/"property_addresses"\."neighborhood" is not null and "property_addresses"\."neighborhood" <> ''/);
+    expect(text).toMatch(/"properties"\."private_area" is not null or "properties"\."total_area" is not null/);
   });
 });

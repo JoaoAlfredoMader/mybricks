@@ -1,4 +1,4 @@
-import type { TransactionType } from "../../generated/prisma/enums.js";
+import type { TransactionType } from "../../db/enums.js";
 import { centsToNumber } from "../../shared/money.js";
 import type { TransactionRecord } from "./transactions.repository.js";
 

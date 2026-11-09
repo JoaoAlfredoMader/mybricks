@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ProposalType } from "../../generated/prisma/enums.js";
+import { ProposalType } from "../../db/enums.js";
 import { optionalText } from "../../shared/validation/optional-text.js";
 
 const date = z.iso.date();

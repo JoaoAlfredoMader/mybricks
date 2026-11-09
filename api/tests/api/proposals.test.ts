@@ -1,6 +1,8 @@
+import { count, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { check } from "../helpers/check.js";
-import { type Account, Session, createCast, prisma, resetDatabase } from "../helpers/world.js";
+import { propertyProposals } from "../../src/db/schema.js";
+import { type Account, Session, close, createCast, db, resetDatabase } from "../helpers/world.js";
 
 /**
  * One scenario told in order: each test builds on the data of the previous ones,
@@ -25,7 +27,7 @@ describe("Proposals and financing schedule API", () => {
   beforeAll(async () => {
     await resetDatabase();
   });
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("requires a session", async () => {
     const anon = new Session();
@@ -104,7 +106,7 @@ describe("Proposals and financing schedule API", () => {
       (await carlos.session.call("PATCH", `${proposals(apto)}/${stillThere.id}`, { notes: "x" })).status === 404 &&
       (await carlos.session.call("DELETE", `${proposals(apto)}/${stillThere.id}`)).status === 404 &&
       (await carlos.session.call("GET", proposals(apto))).status === 404);
-    check("deleting the property removes its proposals", (await ana.session.call("DELETE", `/api/properties/${apto}`)).status === 204 && (await prisma.propertyProposal.count({ where: { propertyId: apto } })) === 0);
+    check("deleting the property removes its proposals", (await ana.session.call("DELETE", `/api/properties/${apto}`)).status === 204 && (await db.select({ value: count() }).from(propertyProposals).where(eq(propertyProposals.propertyId, apto)))[0]!.value === 0);
   });
 
   it("serves the financing schedule", async () => {

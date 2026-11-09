@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { requireAuth } from "../../shared/http/auth.middleware.js";
 import { audited } from "../../shared/http/audit.middleware.js";
@@ -20,8 +20,8 @@ import { createContractsService } from "./contracts.service.js";
  * Route layer: HTTP binding (path, validation, serialization).
  * Contracts are never deleted: they are ended or cancelled, so the history stays.
  */
-export function createContractsRoutes(prisma: PrismaClient) {
-  const controller = createContractsController(createContractsService(createContractsRepository(prisma)));
+export function createContractsRoutes(db: Database) {
+  const controller = createContractsController(createContractsService(createContractsRepository(db)));
 
   return new Hono<AppEnv>()
     .use(requireAuth)

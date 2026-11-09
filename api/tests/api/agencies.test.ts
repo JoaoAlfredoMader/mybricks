@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { check } from "../helpers/check.js";
-import { type Account, Session, createCast, prisma, resetDatabase } from "../helpers/world.js";
+import { type Account, Session, close, createCast, resetDatabase } from "../helpers/world.js";
 
 /**
  * One scenario told in order: each test builds on the data of the previous ones,
@@ -16,7 +16,7 @@ describe("Agencies API", () => {
   beforeAll(async () => {
     await resetDatabase();
   });
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("requires a session", async () => {
     const anon = new Session();

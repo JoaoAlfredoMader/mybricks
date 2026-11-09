@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { PrismaClient } from "../../lib/prisma.js";
+import type { Database } from "../../db/database.js";
 import type { AppEnv } from "../../shared/http/app-env.js";
 import { requireAuth } from "../../shared/http/auth.middleware.js";
 import { audited } from "../../shared/http/audit.middleware.js";
@@ -16,8 +16,8 @@ import {
 import { createTransactionsService } from "./transactions.service.js";
 
 /** Route layer: HTTP binding (path, validation, serialization). */
-export function createTransactionsRoutes(prisma: PrismaClient) {
-  const controller = createTransactionsController(createTransactionsService(createTransactionsRepository(prisma)));
+export function createTransactionsRoutes(db: Database) {
+  const controller = createTransactionsController(createTransactionsService(createTransactionsRepository(db)));
 
   return new Hono<AppEnv>()
     .use(requireAuth)

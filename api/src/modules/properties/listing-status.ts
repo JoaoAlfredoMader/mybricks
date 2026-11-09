@@ -1,4 +1,5 @@
-import type { Prisma } from "../../generated/prisma/client.js";
+import { type SQL, and, isNotNull, isNull, sql } from "drizzle-orm";
+import { organizations, properties, propertyAddresses, propertyPhotos } from "../../db/schema.js";
 
 /**
  * Where a for-sale property stands as a public listing. Derived on every read, never stored:
@@ -11,15 +12,13 @@ export type ListingStatus = "pending" | "live" | "hidden";
 /** What a for-sale property still needs before it can go live. */
 export type ListingGap = "photo" | "address" | "area";
 
-type AreaValue = number | { toNumber(): number };
-
 export interface ListingFacts {
   hiddenAt: Date | null;
   photoCount: number;
   /** `null` when the property has no address at all. The city comes with the address. */
   address: { neighborhood: string | null } | null;
-  privateArea: AreaValue | null;
-  totalArea: AreaValue | null;
+  privateArea: number | null;
+  totalArea: number | null;
 }
 
 export interface ListingState {
@@ -51,16 +50,17 @@ export function deriveListingState(facts: ListingFacts): ListingState {
 
 /**
  * The SQL face of the rule: which properties are public listings. The public read is not tenant
- * scoped (it crosses organizations on purpose), so this `where` is the whole access control:
+ * scoped (it crosses organizations on purpose), so this condition is the whole access control:
  * for sale, not hidden, not from a demo workspace, with a photo, a neighborhood and an area.
+ * Meant for a query that selects from `properties`.
  */
-export function liveListingWhere(): Prisma.PropertyWhereInput {
-  return {
-    listingPriceCents: { not: null },
-    listingHiddenAt: null,
-    organization: { isDemo: false },
-    photos: { some: {} },
-    address: { is: { AND: [{ neighborhood: { not: null } }, { neighborhood: { not: "" } }] } },
-    OR: [{ privateArea: { not: null } }, { totalArea: { not: null } }],
-  };
+export function liveListingWhere(): SQL {
+  return and(
+    isNotNull(properties.listingPriceCents),
+    isNull(properties.listingHiddenAt),
+    sql`exists (select 1 from ${organizations} where ${organizations.id} = ${properties.organizationId} and ${organizations.isDemo} = 0)`,
+    sql`exists (select 1 from ${propertyPhotos} where ${propertyPhotos.propertyId} = ${properties.id})`,
+    sql`exists (select 1 from ${propertyAddresses} where ${propertyAddresses.propertyId} = ${properties.id} and ${propertyAddresses.neighborhood} is not null and ${propertyAddresses.neighborhood} <> '')`,
+    sql`(${properties.privateArea} is not null or ${properties.totalArea} is not null)`,
+  ) as SQL;
 }

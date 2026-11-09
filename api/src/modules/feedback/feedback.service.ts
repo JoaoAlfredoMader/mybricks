@@ -1,4 +1,4 @@
-import type { FeedbackStatus } from "../../generated/prisma/enums.js";
+import type { FeedbackStatus } from "../../db/enums.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import type { TenantScope } from "../../shared/http/tenant.js";
 import {
@@ -20,7 +20,7 @@ export interface FeedbackService {
   setStatus(id: string, status: FeedbackStatus): Promise<AdminFeedbackDto>;
 }
 
-/** Service layer: business rules. No HTTP, no Prisma. */
+/** Service layer: business rules. No HTTP, no database. */
 export function createFeedbackService(repository: FeedbackRepository): FeedbackService {
   const toQuery = ({ page, pageSize, status }: ListFeedbackInput) => ({
     ...(status ? { status } : {}),

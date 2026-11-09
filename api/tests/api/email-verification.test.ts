@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { loadEnv } from "../../src/config/env.js";
 import { createContainer } from "../../src/container.js";
 import { createMemoryMailer } from "../../src/lib/mail/memory-mailer.js";
+import { organizations, users } from "../../src/db/schema.js";
 import { check } from "../helpers/check.js";
-import { Session, prisma, resetDatabase } from "../helpers/world.js";
+import { Session, close, db, resetDatabase } from "../helpers/world.js";
 
 /**
  * The app wired the way production runs it: sign-in waits for the e-mail link, and the e-mail
@@ -26,8 +28,8 @@ describe("E-mail confirmation", () => {
 
   beforeAll(resetDatabase);
   afterAll(async () => {
-    await verifying.prisma.$disconnect();
-    await prisma.$disconnect();
+    verifying.close();
+    close();
   });
 
   it("sign-up sends the e-mail and does not open a session", async () => {
@@ -46,8 +48,8 @@ describe("E-mail confirmation", () => {
       mailer.outbox[0]?.to === "ana@example.com" && mailer.outbox[0].subject === "Confirme seu e-mail no MyBricks",
       mailer.outbox[0],
     );
-    const user = await prisma.user.findUniqueOrThrow({ where: { email: "ana@example.com" } });
-    check("the account exists, not confirmed", user.emailVerified === false);
+    const [user] = await db.select().from(users).where(eq(users.email, "ana@example.com"));
+    check("the account exists, not confirmed", user?.emailVerified === false);
   });
 
   it("signing in before confirming is refused and sends a fresh link", async () => {
@@ -64,7 +66,7 @@ describe("E-mail confirmation", () => {
     const me = await ana.call("GET", "/api/me");
     check("signed in as Ana", me.status === 200 && me.json?.user?.email === "ana@example.com", me);
     check("in her personal organization, as owner", Boolean(me.json?.organizationId) && me.json?.memberRole === "owner", me.json);
-    check("the address is now confirmed", (await prisma.user.findUniqueOrThrow({ where: { email: "ana@example.com" } })).emailVerified === true);
+    check("the address is now confirmed", (await db.select().from(users).where(eq(users.email, "ana@example.com")))[0]!.emailVerified === true);
     const normal = new Session(verifying.app);
     check("and e-mail sign-in works from then on", (await normal.call("POST", "/api/auth/sign-in/email", { email: "ana@example.com", password: "senha-forte-123" })).status === 200);
   });
@@ -81,7 +83,7 @@ describe("E-mail confirmation", () => {
     check("guest sign-in -> 200", (await guest.call("POST", "/api/auth/sign-in/anonymous")).status === 200);
     const before = await guest.call("GET", "/api/me");
     const guestOrganization = before.json?.organizationId as string;
-    check("the guest works in a demo organization", (await prisma.organization.findUniqueOrThrow({ where: { id: guestOrganization } })).isDemo === true);
+    check("the guest works in a demo organization", (await db.select().from(organizations).where(eq(organizations.id, guestOrganization)))[0]?.isDemo === true);
 
     const sent = mailer.outbox.length;
     const signUp = await guest.call("POST", "/api/auth/sign-up/email", { name: "Bia Lima", email: "bia@example.com", password: "senha-forte-123", callbackURL });
@@ -92,7 +94,7 @@ describe("E-mail confirmation", () => {
     check("now Bia, no longer a guest", after.json?.user?.email === "bia@example.com" && after.json?.user?.isAnonymous === false, after.json?.user);
     check(
       "the demo organization is hers and no longer expires",
-      after.json?.organizationId === guestOrganization && (await prisma.organization.findUniqueOrThrow({ where: { id: guestOrganization } })).isDemo === false,
+      after.json?.organizationId === guestOrganization && (await db.select().from(organizations).where(eq(organizations.id, guestOrganization)))[0]?.isDemo === false,
       after.json,
     );
   });

@@ -7,7 +7,8 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     PORT: z.coerce.number().int().positive().default(3000),
-    DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+    /** Node only: a libSQL URL, `file:` for a local SQLite file. On Cloudflare the Worker uses the D1 binding instead. */
+    DATABASE_URL: z.string().min(1).default("file:.data/mybricks.db"),
 
     BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must have at least 32 characters"),
     BETTER_AUTH_URL: z.string().url().default("http://localhost:3000"),

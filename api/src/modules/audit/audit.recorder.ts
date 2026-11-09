@@ -1,4 +1,4 @@
-import type { AuditAction, AuditEntityType } from "../../generated/prisma/enums.js";
+import type { AuditAction, AuditEntityType } from "../../db/enums.js";
 import type { AuditRepository } from "./audit.repository.js";
 
 export interface AuditEvent {
@@ -53,8 +53,13 @@ export function createAuditRecorder(repository: AuditRepository): AuditRecorder 
   };
 }
 
-/** The caller's address as reported by the proxy in front of the API. */
+/**
+ * The caller's address as reported by the proxy in front of the API. Cloudflare always overwrites
+ * `cf-connecting-ip`, so it wins when present; the other two cover a plain reverse proxy.
+ */
 export function clientIp(headers: { get(name: string): string | null }): string | null {
+  const cloudflare = headers.get("cf-connecting-ip")?.trim();
+  if (cloudflare) return cloudflare;
   const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   return forwarded || headers.get("x-real-ip") || null;
 }

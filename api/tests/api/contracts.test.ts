@@ -1,6 +1,12 @@
+import { type SQL, and, count, eq } from "drizzle-orm";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { afterAll, beforeAll, describe, it } from "vitest";
+import { contracts, members, occupants } from "../../src/db/schema.js";
 import { check } from "../helpers/check.js";
-import { type ApiResponse, Session, prisma, resetDatabase, signUp } from "../helpers/world.js";
+import { type ApiResponse, Session, close, db, resetDatabase, signUp } from "../helpers/world.js";
+
+/** Number of rows of a table that match the condition. */
+const countRows = async (table: SQLiteTable, where?: SQL) => (await db.select({ value: count() }).from(table).where(where))[0]!.value;
 
 const CPF_1 = "529.982.247-25";
 const CPF_2 = "168.995.350-09";
@@ -16,7 +22,7 @@ describe("Contracts API", () => {
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   beforeAll(resetDatabase);
-  afterAll(() => prisma.$disconnect());
+  afterAll(() => close());
 
   it("sets up the scenario", async () => {
     const anon = new Session();
@@ -26,7 +32,7 @@ describe("Contracts API", () => {
     ana = await signUp("Ana Souza", "ana@example.com");
     bia = await signUp("Bia Lima", "bia@example.com");
     carlos = await signUp("Carlos Dias", "carlos@example.com");
-    await prisma.member.create({ data: { organizationId: ana.organizationId, userId: bia.userId, role: "member" } });
+    await db.insert(members).values({ organizationId: ana.organizationId, userId: bia.userId, role: "member" });
     await bia.session.call("POST", "/api/auth/organization/set-active", { organizationId: ana.organizationId });
 
     const mkProperty = async (who: typeof ana, name: string, usageType: string, rentalMode = "contract", propertyType = "residential") => {
@@ -74,7 +80,7 @@ describe("Contracts API", () => {
     await bad("non-uuid property -> 400", { ...base, propertyId: "x" });
     await bad("unknown adjustment index -> 400", { ...base, propertyId: apto2, rentTerms: { ...terms, adjustmentIndex: "xyz" } });
     await bad("unknown occupantId -> 400", { ...base, propertyId: apto2, occupant: undefined, occupantId: "00000000-0000-4000-8000-000000000000" }, "occupantId");
-    check("failed creates left nothing behind", (await prisma.contract.count()) === 1 && (await prisma.occupant.count()) === 1);
+    check("failed creates left nothing behind", (await countRows(contracts)) === 1 && (await countRows(occupants)) === 1);
   });
 
   it("business rules", async () => {
@@ -97,7 +103,7 @@ describe("Contracts API", () => {
     });
     check("short-stay contract -> 201 without rent terms", stay.status === 201 && stay.json.rentTerms === null && stay.json.endDate === "2026-12-31", stay);
     check("same document reuses the stored occupant", stay.json?.occupant?.id === c1.occupant.id && stay.json.occupant.name === "João Inquilino", stay.json?.occupant);
-    check("only one occupant row for that document", (await prisma.occupant.count({ where: { document: "52998224725" } })) === 1);
+    check("only one occupant row for that document", (await countRows(occupants, eq(occupants.document, "52998224725"))) === 1);
     const byId = await ana.session.call("POST", "/api/contracts", { ...base, propertyId: apto2, occupant: undefined, occupantId: c1.occupant.id });
     check("existing occupant by id -> 201", byId.status === 201 && byId.json.occupant.id === c1.occupant.id, byId);
     const company = await ana.session.call("POST", "/api/contracts", {
@@ -111,20 +117,20 @@ describe("Contracts API", () => {
     check("new contract on a let property -> 201 reporting the replaced one", second.status === 201 && second.json.replacedContractId === c1.id, second);
     const c1After = await ana.session.call("GET", `/api/contracts/${c1.id}`);
     check("previous contract ended and shortened to the new start", c1After.json?.status === "ended" && c1After.json.endDate === "2026-06-01", c1After.json);
-    check("exactly one active contract on the property", (await prisma.contract.count({ where: { propertyId: apto, status: "active" } })) === 1);
+    check("exactly one active contract on the property", (await countRows(contracts, and(eq(contracts.propertyId, apto), eq(contracts.status, "active")))) === 1);
     const third = await ana.session.call("POST", "/api/contracts", { ...base, startDate: "2026-12-01", endDate: "2027-12-01", rentTerms: { ...terms, monthlyRentCents: 450_000 }, occupant: { name: "Maria Nova", document: CPF_2 } });
     const c2After = await ana.session.call("GET", `/api/contracts/${second.json.id}`);
     check("replacing again ends the second one", third.json?.replacedContractId === second.json.id && c2After.json?.status === "ended" && c2After.json.endDate === "2026-12-01", c2After.json);
     // a contract that already ended earlier keeps its own end date
-    await prisma.contract.update({ where: { id: third.json.id }, data: { endDate: new Date("2027-01-10") } });
+    await db.update(contracts).set({ endDate: new Date("2027-01-10") }).where(eq(contracts.id, third.json.id));
     const fourth = await ana.session.call("POST", "/api/contracts", { ...base, startDate: "2027-03-01", occupant: { name: "Maria Nova", document: CPF_2 } });
     const c3After = await ana.session.call("GET", `/api/contracts/${third.json.id}`);
     check("an end date already before the new start is kept", fourth.status === 201 && c3After.json?.status === "ended" && c3After.json.endDate === "2027-01-10", c3After.json);
     retro = await ana.session.call("POST", "/api/contracts", { ...base, startDate: "2026-01-01", occupant: { name: "Maria Nova", document: CPF_2 } });
     const c4After = await ana.session.call("GET", `/api/contracts/${fourth.json.id}`);
     check("a retroactive contract ends the active one without moving its dates", retro.status === 201 && c4After.json?.status === "ended" && c4After.json.endDate === null && c4After.json.startDate === "2027-03-01", c4After.json);
-    check("history is kept: 5 contracts on the property", (await prisma.contract.count({ where: { propertyId: apto } })) === 5);
-    check("still exactly one active contract", (await prisma.contract.count({ where: { propertyId: apto, status: "active" } })) === 1);
+    check("history is kept: 5 contracts on the property", (await countRows(contracts, eq(contracts.propertyId, apto))) === 5);
+    check("still exactly one active contract", (await countRows(contracts, and(eq(contracts.propertyId, apto), eq(contracts.status, "active")))) === 1);
   });
 
   it("concurrent creates never leave two active contracts", async () => {
@@ -132,7 +138,7 @@ describe("Contracts API", () => {
       ana.session.call("POST", "/api/contracts", { ...base, propertyId: apto2, startDate: `2026-0${n + 6}-01`, occupant: { name: "Maria Nova", document: CPF_2 } })));
     check("concurrent creates: statuses are 201 or 409", racers.every((r) => r.status === 201 || r.status === 409), racers.map((r) => r.status));
     check("concurrent creates: at least one wins", racers.some((r) => r.status === 201));
-    check("concurrent creates: still one active contract", (await prisma.contract.count({ where: { propertyId: apto2, status: "active" } })) === 1);
+    check("concurrent creates: still one active contract", (await countRows(contracts, and(eq(contracts.propertyId, apto2), eq(contracts.status, "active")))) === 1);
   });
 
   it("list / get", async () => {
@@ -196,7 +202,7 @@ describe("Contracts API", () => {
     check("occupant search by name", (await ana.session.call("GET", "/api/occupants?search=maria")).json?.total === 1);
     check("occupant search by document digits", (await ana.session.call("GET", "/api/occupants?search=5299822")).json?.total === 1);
     check("occupant pagination", (await ana.session.call("GET", "/api/occupants?page=2&pageSize=2")).json?.items?.length === 1);
-    check("owner sees all contracts", (await ana.session.call("GET", "/api/contracts?pageSize=100")).json?.total === (await prisma.contract.count({ where: { organizationId: ana.organizationId } })));
+    check("owner sees all contracts", (await ana.session.call("GET", "/api/contracts?pageSize=100")).json?.total === (await countRows(contracts, eq(contracts.organizationId, ana.organizationId))));
   });
 
   it("tenant isolation", async () => {
@@ -213,6 +219,6 @@ describe("Contracts API", () => {
   });
 
   it("property deletion removes its contracts (explicit, destructive)", async () => {
-    check("deleting the property removes the contracts", (await ana.session.call("DELETE", `/api/properties/${apto2}`)).status === 204 && (await prisma.contract.count({ where: { propertyId: apto2 } })) === 0);
+    check("deleting the property removes the contracts", (await ana.session.call("DELETE", `/api/properties/${apto2}`)).status === 204 && (await countRows(contracts, eq(contracts.propertyId, apto2))) === 0);
   });
 });

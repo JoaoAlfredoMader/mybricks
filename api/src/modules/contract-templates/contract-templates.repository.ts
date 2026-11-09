@@ -1,4 +1,6 @@
-import type { PrismaClient } from "../../lib/prisma.js";
+import { eq } from "drizzle-orm";
+import type { Database } from "../../db/database.js";
+import { contractTemplates } from "../../db/schema.js";
 
 export interface TemplateRecord {
   header: string;
@@ -21,27 +23,40 @@ export interface ContractTemplatesRepository {
   delete(organizationId: string): Promise<boolean>;
 }
 
-const select = { header: true, clauses: true, footer: true, updatedById: true, updatedAt: true } as const;
+const columns = {
+  header: contractTemplates.header,
+  clauses: contractTemplates.clauses,
+  footer: contractTemplates.footer,
+  updatedById: contractTemplates.updatedById,
+  updatedAt: contractTemplates.updatedAt,
+};
 
-/** Repository layer: the only place that talks to Prisma. One template per organization. */
-export function createContractTemplatesRepository(prisma: PrismaClient): ContractTemplatesRepository {
+/** Repository layer: the only place that talks to the database. One template per organization. */
+export function createContractTemplatesRepository(db: Database): ContractTemplatesRepository {
   return {
-    find(organizationId) {
-      return prisma.contractTemplate.findUnique({ where: { organizationId }, select });
+    async find(organizationId) {
+      const [row] = await db.select(columns).from(contractTemplates).where(eq(contractTemplates.organizationId, organizationId));
+      return row ?? null;
     },
 
-    save(organizationId, updatedById, data) {
-      return prisma.contractTemplate.upsert({
-        where: { organizationId },
-        create: { organizationId, updatedById, ...data },
-        update: { updatedById, ...data },
-        select,
-      });
+    async save(organizationId, updatedById, data) {
+      const [row] = await db
+        .insert(contractTemplates)
+        .values({ organizationId, updatedById, ...data })
+        .onConflictDoUpdate({
+          target: contractTemplates.organizationId,
+          set: { updatedById, ...data, updatedAt: new Date() },
+        })
+        .returning(columns);
+      return row!;
     },
 
     async delete(organizationId) {
-      const { count } = await prisma.contractTemplate.deleteMany({ where: { organizationId } });
-      return count > 0;
+      const removed = await db
+        .delete(contractTemplates)
+        .where(eq(contractTemplates.organizationId, organizationId))
+        .returning({ organizationId: contractTemplates.organizationId });
+      return removed.length > 0;
     },
   };
 }
