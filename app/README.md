@@ -2,7 +2,7 @@
 
 Front-end of **MyBricks**, a real-estate portfolio management platform: properties, clients, rental contracts and short-stay reservations, finances and portfolio KPIs (yield, cap rate, NOI, IRR).
 
-> Portfolio project. API: [my-bricks-back-end](https://github.com/JoaoAlfredoMader/my-bricks-back-end).
+> Portfolio project. Lives in the `app/` folder of the MyBricks monorepo; the API is in [`../api`](../api).
 
 ## Stack
 
@@ -26,7 +26,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-In development Vite proxies `/api` to `http://localhost:3000`, so the browser talks to one origin and the session cookie works as it will in production. Start the API from the back-end repository (`npm run db:up`, `npm run dev`; see its README).
+In development Vite proxies `/api` to `http://localhost:3000`, so the browser talks to one origin and the session cookie works as it will in production. Start the API from the repository root (`npm run db:up`, then `npm run dev:api`; see [`api/README.md`](../api/README.md)).
 
 ## Scripts
 
@@ -39,7 +39,7 @@ In development Vite proxies `/api` to `http://localhost:3000`, so the browser ta
 | `npm run coverage` | the suite with a v8 coverage report (`coverage/`) and a floor it must stay above |
 | `npm run typecheck` | TypeScript check |
 | `npm run lint` | oxlint |
-| `npm run api:types` | regenerate `src/lib/api/schema.d.ts` from `../my-bricks-back-end/docs/openapi.json` |
+| `npm run api:types` | export the API's OpenAPI document and regenerate `src/lib/api/schema.d.ts` from `../api/docs/openapi.json` |
 | `npm run hero:images` | turn the hero renders into responsive WebP files (see below) |
 
 ## Project structure
@@ -90,7 +90,7 @@ The landing has its own palette and typeface (Bricolage Grotesque), scoped to `.
 
 ## API client
 
-`src/lib/api/client.ts` exports `api`, an [openapi-fetch](https://openapi-ts.dev/openapi-fetch/) client typed by `schema.d.ts`, which `npm run api:types` generates from the back-end's `docs/openapi.json` (the back-end repository is expected next to this one). The generated file is committed, so a fresh clone builds without the back-end. `openapi-typescript` runs through `npx` because it still asks for TypeScript 5 as a peer.
+`src/lib/api/client.ts` exports `api`, an [openapi-fetch](https://openapi-ts.dev/openapi-fetch/) client typed by `schema.d.ts`, which `npm run api:types` generates from the back-end's `docs/openapi.json` (the API lives in `../api`, in the same repository). The generated file is committed, so a fresh clone builds without the back-end. `openapi-typescript` runs through `npx` because it still asks for TypeScript 5 as a peer.
 
 `unwrap(api.GET(...))` returns the data or throws an `ApiError` carrying the API's `code`, `message` and, for validation errors, `fieldErrors` (`[{ path, message }]`).
 

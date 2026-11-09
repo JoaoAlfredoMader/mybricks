@@ -2,7 +2,7 @@
 
 Back-end of **MyBricks**, a real-estate portfolio management platform: properties, clients, rental contracts and short-stay reservations, finances and portfolio KPIs (yield, cap rate, NOI, IRR).
 
-> Portfolio project. Front-end: [my-bricks-front-end](https://github.com/JoaoAlfredoMader/my-bricks-front-end).
+> Portfolio project. Lives in the `api/` folder of the MyBricks monorepo; the front-end is in [`../app`](../app).
 
 ## Stack
 
