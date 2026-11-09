@@ -1,5 +1,5 @@
 {
-  "name": "my-bricks-back-end",
+  "name": "@mybricks/api",
   "version": "0.1.0",
   "private": true,
   "description": "MyBricks API: real-estate portfolio management (Hono, Prisma, PostgreSQL, Better Auth).",

@@ -1,5 +1,5 @@
 {
-  "name": "my-bricks",
+  "name": "mybricks",
   "private": true,
   "description": "MyBricks monorepo: app (React front-end) and api (Hono back-end).",
   "type": "module",

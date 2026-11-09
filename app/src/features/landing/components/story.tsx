@@ -2,8 +2,8 @@ import { Link } from '@tanstack/react-router'
 import type { Ref } from 'react'
 
 const REPOSITORIES = {
-  backEnd: 'https://github.com/JoaoAlfredoMader/my-bricks-back-end',
-  frontEnd: 'https://github.com/JoaoAlfredoMader/my-bricks-front-end',
+  backEnd: 'https://github.com/JoaoAlfredoMader/mybricks/tree/main/api',
+  frontEnd: 'https://github.com/JoaoAlfredoMader/mybricks/tree/main/app',
 }
 
 // Placeholder copy: the author will replace it with the real story.

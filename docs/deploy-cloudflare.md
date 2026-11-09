@@ -66,7 +66,7 @@ Rodar `db:seed` contra produção (referências e cidades) e `admin:create` para
 
 ## 5. Repositório e fluxo de branches
 
-1. Hoje o monorepo vive no repositório `my-bricks-front-end`. Renomear no GitHub para `my-bricks` (os links antigos redirecionam) e arquivar `my-bricks-back-end`. O back tem 6 commits locais que nunca foram enviados; eles já estão dentro do monorepo.
+1. O monorepo vive no repositório `mybricks` (renomeado de `my-bricks-front-end` em 2026-11-09; os links antigos redirecionam). Arquivar `my-bricks-back-end`. O back tinha 6 commits locais que nunca foram enviados; eles já estão dentro do monorepo.
 2. `story.tsx` da landing aponta para os dois repositórios antigos: atualizar para o novo.
 3. Depois do primeiro deploy: `main` = produção; `development` = trabalho do dia a dia, com ambiente de homologação próprio (outro Worker/`env` do wrangler e **outro banco**, nunca o de produção) e merge em `main` para publicar.
 4. CI (GitHub Actions ou Workers Builds): em `development` roda typecheck, lint e testes; em `main` roda os mesmos, aplica as migrations e faz o deploy.
