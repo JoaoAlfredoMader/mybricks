@@ -3,9 +3,10 @@ import { z } from 'zod'
 import { sessionQueryOptions } from '@/features/auth/api/session'
 import { LoginPage } from '@/features/auth/components/login-page'
 import { redirectTarget } from '@/features/auth/lib/redirect-target'
+import { verificationLinkError } from '@/features/auth/lib/verification'
 
 export const Route = createFileRoute('/login')({
-  validateSearch: z.object({ redirect: z.string().optional() }),
+  validateSearch: z.object({ redirect: z.string().optional(), error: z.string().optional() }),
   beforeLoad: async ({ context, search }) => {
     // The sign-in screen stays usable when the API cannot be reached; the forms report it.
     const session = await context.queryClient.ensureQueryData(sessionQueryOptions).catch(() => null)
@@ -16,6 +17,11 @@ export const Route = createFileRoute('/login')({
 
 export function LoginRoute() {
   const router = useRouter()
-  const { redirect: target } = Route.useSearch()
-  return <LoginPage onSignedIn={() => router.history.replace(redirectTarget(target))} />
+  const { redirect: target, error } = Route.useSearch()
+  return (
+    <LoginPage
+      onSignedIn={() => router.history.replace(redirectTarget(target))}
+      linkError={verificationLinkError(error)}
+    />
+  )
 }

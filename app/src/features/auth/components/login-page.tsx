@@ -1,6 +1,6 @@
 import '@fontsource-variable/archivo/standard.css'
 import { Link } from '@tanstack/react-router'
-import { ArrowLeft, Sparkles } from 'lucide-react'
+import { ArrowLeft, CircleAlert, Sparkles } from 'lucide-react'
 import { BrandMark } from '@/components/brand-mark'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -13,9 +13,11 @@ import { SignUpForm } from './sign-up-form'
 interface LoginPageProps {
   /** Called once the session exists; the route decides where to go. */
   onSignedIn: () => void
+  /** Why the confirmation link the visitor followed did not work, when it did not. */
+  linkError?: string | null
 }
 
-export function LoginPage({ onSignedIn }: LoginPageProps) {
+export function LoginPage({ onSignedIn, linkError = null }: LoginPageProps) {
   const guest = useGuestSignIn()
 
   return (
@@ -49,6 +51,13 @@ export function LoginPage({ onSignedIn }: LoginPageProps) {
           <BrandMark className="mb-6 size-10 text-primary" />
           <h1 className="text-2xl font-semibold tracking-tight">Entrar no MyBricks</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">Use sua conta ou explore uma carteira de exemplo.</p>
+
+          {linkError ? (
+            <p role="alert" className="mt-6 flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              {linkError}
+            </p>
+          ) : null}
 
           <Tabs defaultValue="sign-in" className="mt-8">
             <TabsList className="grid w-full grid-cols-2 group-data-horizontal/tabs:h-9">

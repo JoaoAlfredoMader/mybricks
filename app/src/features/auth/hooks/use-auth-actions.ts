@@ -2,6 +2,7 @@ import { type QueryClient, useMutation, useQueryClient } from '@tanstack/react-q
 import { authClient } from '@/lib/auth-client'
 import { sessionQueryOptions } from '../api/session'
 import { orThrow } from '../lib/auth-error'
+import { verificationCallbackUrl } from '../lib/verification'
 
 export interface SignInValues {
   email: string
@@ -20,7 +21,9 @@ function refreshSession(queryClient: QueryClient) {
 export function useSignIn() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (values: SignInValues) => orThrow(authClient.signIn.email(values)),
+    // The callback is where the link of a re-sent confirmation e-mail lands.
+    mutationFn: (values: SignInValues) =>
+      orThrow(authClient.signIn.email({ ...values, callbackURL: verificationCallbackUrl() })),
     onSuccess: () => refreshSession(queryClient),
   })
 }
@@ -28,9 +31,18 @@ export function useSignIn() {
 export function useSignUp() {
   const queryClient = useQueryClient()
   return useMutation({
-    // The API creates the personal organization and makes it the active one.
-    mutationFn: (values: SignUpValues) => orThrow(authClient.signUp.email(values)),
+    // The API creates the personal organization and makes it the active one. When it asks for the
+    // e-mail to be confirmed first, the answer carries no token and no session exists yet.
+    mutationFn: (values: SignUpValues) =>
+      orThrow(authClient.signUp.email({ ...values, callbackURL: verificationCallbackUrl() })),
     onSuccess: () => refreshSession(queryClient),
+  })
+}
+
+export function useResendVerification() {
+  return useMutation({
+    mutationFn: (email: string) =>
+      orThrow(authClient.sendVerificationEmail({ email, callbackURL: verificationCallbackUrl() })),
   })
 }
 

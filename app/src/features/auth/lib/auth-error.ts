@@ -20,6 +20,7 @@ const MESSAGES: Record<string, string> = {
   PASSWORD_TOO_SHORT: 'A senha precisa ter pelo menos 8 caracteres.',
   PASSWORD_TOO_LONG: 'Essa senha é longa demais.',
   BANNED_USER: 'Esta conta foi suspensa.',
+  EMAIL_NOT_VERIFIED: 'Confirme seu e-mail antes de entrar. Enviamos um novo link para a sua caixa de entrada.',
 }
 
 export function authErrorMessage(code: string | undefined, status: number): string {

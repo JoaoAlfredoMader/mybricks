@@ -90,6 +90,90 @@ describe('Login page', () => {
     })
   })
 
+  it('asks to confirm the e-mail when the API holds the session back, and can send the link again', async () => {
+    const user = userEvent.setup()
+    const api = fakeApi({
+      handlers: {
+        // No session and no token: the account waits for the link in the e-mail.
+        'POST /api/auth/sign-up/email': () => json({ token: null, user: { id: 'user-2' } }),
+        'POST /api/auth/send-verification-email': () => json({ status: true }),
+      },
+    })
+    renderRoute('/login')
+
+    await user.click(await screen.findByRole('tab', { name: 'Criar conta' }))
+    await user.type(screen.getByLabelText('Nome'), 'Bruno Lima')
+    await user.type(screen.getByLabelText('E-mail'), 'bruno@example.com')
+    await user.type(screen.getByLabelText('Senha'), 'curta-e-longa')
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }))
+
+    expect(await screen.findByRole('heading', { name: 'Confirme seu e-mail' })).toBeInTheDocument()
+    expect(screen.getByText('bruno@example.com')).toBeInTheDocument()
+    expect(api.callsTo('/api/auth/sign-up/email')[0]?.body).toMatchObject({
+      callbackURL: 'http://mybricks.test/login',
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Reenviar e-mail' }))
+    expect(await screen.findByText('Enviamos o link de novo.')).toBeInTheDocument()
+    expect(api.callsTo('/api/auth/send-verification-email')[0]?.body).toMatchObject({
+      email: 'bruno@example.com',
+      callbackURL: 'http://mybricks.test/login',
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Usar outro e-mail' }))
+    expect(screen.getByLabelText('E-mail')).toHaveValue('bruno@example.com')
+  })
+
+  it('says so when the link could not be sent again', async () => {
+    const user = userEvent.setup()
+    fakeApi({
+      handlers: {
+        'POST /api/auth/sign-up/email': () => json({ token: null, user: { id: 'user-2' } }),
+        'POST /api/auth/send-verification-email': () => json({ message: 'Too many requests' }, 429),
+      },
+    })
+    renderRoute('/login')
+
+    await user.click(await screen.findByRole('tab', { name: 'Criar conta' }))
+    await user.type(screen.getByLabelText('Nome'), 'Bruno Lima')
+    await user.type(screen.getByLabelText('E-mail'), 'bruno@example.com')
+    await user.type(screen.getByLabelText('Senha'), 'curta-e-longa')
+    await user.click(screen.getByRole('button', { name: 'Criar conta' }))
+    await user.click(await screen.findByRole('button', { name: 'Reenviar e-mail' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Muitas tentativas seguidas.')
+  })
+
+  it('explains that an unconfirmed e-mail cannot sign in yet', async () => {
+    const user = userEvent.setup()
+    fakeApi({
+      handlers: {
+        'POST /api/auth/sign-in/email': () =>
+          json({ code: 'EMAIL_NOT_VERIFIED', message: 'Email not verified' }, 403),
+      },
+    })
+    renderRoute('/login')
+
+    await user.type(await screen.findByLabelText('E-mail'), 'ana@example.com')
+    await user.type(screen.getByLabelText('Senha'), 'segredo123')
+    await user.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Confirme seu e-mail antes de entrar.')
+  })
+
+  it('explains a confirmation link that did not work', async () => {
+    fakeApi()
+    renderRoute('/login?error=INVALID_TOKEN')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Este link de confirmação expirou ou já foi usado.')
+  })
+
+  it('ignores an unknown ?error= instead of showing it', async () => {
+    fakeApi()
+    renderRoute('/login?error=whatever')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Entrar no MyBricks' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('enters the demo as a guest', async () => {
     const user = userEvent.setup()
     const api = fakeApi({
