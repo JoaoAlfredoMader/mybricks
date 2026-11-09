@@ -11,6 +11,8 @@
     "dev": "tsx watch --env-file=.env src/server.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
+    "dev:worker": "wrangler dev",
+    "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "admin:create": "tsx --env-file=.env src/scripts/create-platform-admin.ts",
     "maintenance": "tsx --env-file=.env src/scripts/maintenance.ts",
@@ -30,11 +32,13 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",
     "@hono/node-server": "^2.1.6",
+    "@libsql/client": "^0.18.0",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@scalar/hono-api-reference": "^0.12.17",
     "better-auth": "^1.7.15",
     "dotenv": "^18.0.9",
+    "drizzle-orm": "^0.45.4",
     "hono": "^4.13.16",
     "htmlparser2": "^12.0.0",
     "pdfkit": "^0.20.2",
@@ -48,9 +52,11 @@
     "@types/pdfkit": "^0.17.7",
     "@types/pg": "^8.23.1",
     "@types/sanitize-html": "^2.16.2",
+    "drizzle-kit": "^0.31.11",
     "prisma": "^7.10.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "wrangler": "^4.158.0"
   }
 }

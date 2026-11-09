@@ -1,0 +1,3599 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "6d98e600-3a9d-43c5-b13c-7dbb46ed7d9c",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "accounts": {
+      "name": "accounts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "access_token": {
+          "name": "access_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "refresh_token": {
+          "name": "refresh_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "id_token": {
+          "name": "id_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "access_token_expires_at": {
+          "name": "access_token_expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "refresh_token_expires_at": {
+          "name": "refresh_token_expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_accounts_user_id": {
+          "name": "ix_accounts_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "uq_accounts_provider_id_account_id": {
+          "name": "uq_accounts_provider_id_account_id",
+          "columns": [
+            "provider_id",
+            "account_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_accounts_user": {
+          "name": "fk_accounts_user",
+          "tableFrom": "accounts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "agencies": {
+      "name": "agencies",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_agencies_id_organization_id": {
+          "name": "uq_agencies_id_organization_id",
+          "columns": [
+            "id",
+            "organization_id"
+          ],
+          "isUnique": true
+        },
+        "uq_agencies_organization_id_name": {
+          "name": "uq_agencies_organization_id_name",
+          "columns": [
+            "organization_id",
+            "name"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_agencies_organization": {
+          "name": "fk_agencies_organization",
+          "tableFrom": "agencies",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "audit_logs": {
+      "name": "audit_logs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "actor_user_id": {
+          "name": "actor_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "actor_name": {
+          "name": "actor_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "actor_email": {
+          "name": "actor_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "actor_role": {
+          "name": "actor_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "impersonated_by_id": {
+          "name": "impersonated_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "details": {
+          "name": "details",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_audit_logs_organization_id_created_at": {
+          "name": "ix_audit_logs_organization_id_created_at",
+          "columns": [
+            "organization_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "ix_audit_logs_actor_user_id_created_at": {
+          "name": "ix_audit_logs_actor_user_id_created_at",
+          "columns": [
+            "actor_user_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "ix_audit_logs_action": {
+          "name": "ix_audit_logs_action",
+          "columns": [
+            "action"
+          ],
+          "isUnique": false
+        },
+        "ix_audit_logs_impersonated_by_id": {
+          "name": "ix_audit_logs_impersonated_by_id",
+          "columns": [
+            "impersonated_by_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_audit_logs_organization": {
+          "name": "fk_audit_logs_organization",
+          "tableFrom": "audit_logs",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_audit_logs_actor": {
+          "name": "fk_audit_logs_actor",
+          "tableFrom": "audit_logs",
+          "tableTo": "users",
+          "columnsFrom": [
+            "actor_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "fk_audit_logs_impersonator": {
+          "name": "fk_audit_logs_impersonator",
+          "tableFrom": "audit_logs",
+          "tableTo": "users",
+          "columnsFrom": [
+            "impersonated_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_audit_logs_action": {
+          "name": "ck_audit_logs_action",
+          "value": "\"audit_logs\".\"action\" in ('login', 'logout', 'create', 'update', 'delete', 'view', 'upload', 'end_contract', 'cancel', 'generate_pdf', 'generate_report', 'invite_member', 'remove_member', 'impersonate_start', 'impersonate_end', 'unauthorized_access')"
+        },
+        "ck_audit_logs_entity_type": {
+          "name": "ck_audit_logs_entity_type",
+          "value": "\"audit_logs\".\"entity_type\" in ('property', 'client', 'transaction', 'document', 'photo', 'contract', 'reservation', 'occupant', 'member', 'organization', 'report', 'feedback')"
+        }
+      }
+    },
+    "cities": {
+      "name": "cities",
+      "columns": {
+        "ibge_code": {
+          "name": "ibge_code",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_cities_state_name": {
+          "name": "uq_cities_state_name",
+          "columns": [
+            "state",
+            "name"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "clients": {
+      "name": "clients",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by_id": {
+          "name": "created_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "person_type": {
+          "name": "person_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'individual'"
+        },
+        "document": {
+          "name": "document",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "whatsapp": {
+          "name": "whatsapp",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_clients_organization_id_created_by_id": {
+          "name": "ix_clients_organization_id_created_by_id",
+          "columns": [
+            "organization_id",
+            "created_by_id"
+          ],
+          "isUnique": false
+        },
+        "uq_clients_id_organization_id": {
+          "name": "uq_clients_id_organization_id",
+          "columns": [
+            "id",
+            "organization_id"
+          ],
+          "isUnique": true
+        },
+        "uq_clients_organization_id_document": {
+          "name": "uq_clients_organization_id_document",
+          "columns": [
+            "organization_id",
+            "document"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_clients_organization": {
+          "name": "fk_clients_organization",
+          "tableFrom": "clients",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_clients_createdBy": {
+          "name": "fk_clients_createdBy",
+          "tableFrom": "clients",
+          "tableTo": "members",
+          "columnsFrom": [
+            "organization_id",
+            "created_by_id"
+          ],
+          "columnsTo": [
+            "organization_id",
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_clients_person_type": {
+          "name": "ck_clients_person_type",
+          "value": "\"clients\".\"person_type\" in ('individual', 'company')"
+        }
+      }
+    },
+    "contract_rent_terms": {
+      "name": "contract_rent_terms",
+      "columns": {
+        "contract_id": {
+          "name": "contract_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contract_type": {
+          "name": "contract_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "monthly_rent_cents": {
+          "name": "monthly_rent_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "due_day": {
+          "name": "due_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "adjustment_index": {
+          "name": "adjustment_index",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_contract_rent_terms_contract_id_contract_type": {
+          "name": "uq_contract_rent_terms_contract_id_contract_type",
+          "columns": [
+            "contract_id",
+            "contract_type"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_contract_rent_terms_contract": {
+          "name": "fk_contract_rent_terms_contract",
+          "tableFrom": "contract_rent_terms",
+          "tableTo": "contracts",
+          "columnsFrom": [
+            "contract_id",
+            "contract_type"
+          ],
+          "columnsTo": [
+            "id",
+            "contract_type"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_contract_rent_terms_contract_type": {
+          "name": "ck_contract_rent_terms_contract_type",
+          "value": "\"contract_rent_terms\".\"contract_type\" in ('conventional', 'short_stay')"
+        },
+        "ck_contract_rent_terms_adjustment_index": {
+          "name": "ck_contract_rent_terms_adjustment_index",
+          "value": "\"contract_rent_terms\".\"adjustment_index\" in ('igpm', 'ipca', 'inpc', 'igpdi', 'other')"
+        },
+        "ck_rent_terms_type": {
+          "name": "ck_rent_terms_type",
+          "value": "\"contract_rent_terms\".\"contract_type\" = 'conventional'"
+        },
+        "ck_rent_terms_values": {
+          "name": "ck_rent_terms_values",
+          "value": "\"contract_rent_terms\".\"monthly_rent_cents\" > 0 AND \"contract_rent_terms\".\"due_day\" BETWEEN 1 AND 31"
+        }
+      }
+    },
+    "contract_templates": {
+      "name": "contract_templates",
+      "columns": {
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "header": {
+          "name": "header",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "clauses": {
+          "name": "clauses",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "footer": {
+          "name": "footer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_by_id": {
+          "name": "updated_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_contract_templates_organization": {
+          "name": "fk_contract_templates_organization",
+          "tableFrom": "contract_templates",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_contract_templates_updatedBy": {
+          "name": "fk_contract_templates_updatedBy",
+          "tableFrom": "contract_templates",
+          "tableTo": "users",
+          "columnsFrom": [
+            "updated_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "contracts": {
+      "name": "contracts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occupant_id": {
+          "name": "occupant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contract_type": {
+          "name": "contract_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'active'"
+        },
+        "start_date": {
+          "name": "start_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "end_date": {
+          "name": "end_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pdf_file_id": {
+          "name": "pdf_file_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_contracts_property_id_status": {
+          "name": "ix_contracts_property_id_status",
+          "columns": [
+            "property_id",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "ix_contracts_organization_id_status": {
+          "name": "ix_contracts_organization_id_status",
+          "columns": [
+            "organization_id",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "ix_contracts_occupant_id_organization_id": {
+          "name": "ix_contracts_occupant_id_organization_id",
+          "columns": [
+            "occupant_id",
+            "organization_id"
+          ],
+          "isUnique": false
+        },
+        "ix_contracts_pdf_file_id_organization_id": {
+          "name": "ix_contracts_pdf_file_id_organization_id",
+          "columns": [
+            "pdf_file_id",
+            "organization_id"
+          ],
+          "isUnique": false
+        },
+        "uq_contracts_one_active_per_property": {
+          "name": "uq_contracts_one_active_per_property",
+          "columns": [
+            "property_id"
+          ],
+          "isUnique": true,
+          "where": "\"contracts\".\"status\" = 'active'"
+        },
+        "uq_contracts_id_organization_id": {
+          "name": "uq_contracts_id_organization_id",
+          "columns": [
+            "id",
+            "organization_id"
+          ],
+          "isUnique": true
+        },
+        "uq_contracts_id_property_id": {
+          "name": "uq_contracts_id_property_id",
+          "columns": [
+            "id",
+            "property_id"
+          ],
+          "isUnique": true
+        },
+        "uq_contracts_id_contract_type": {
+          "name": "uq_contracts_id_contract_type",
+          "columns": [
+            "id",
+            "contract_type"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_contracts_property": {
+          "name": "fk_contracts_property",
+          "tableFrom": "contracts",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_contracts_occupant": {
+          "name": "fk_contracts_occupant",
+          "tableFrom": "contracts",
+          "tableTo": "occupants",
+          "columnsFrom": [
+            "occupant_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_contracts_pdfFile": {
+          "name": "fk_contracts_pdfFile",
+          "tableFrom": "contracts",
+          "tableTo": "stored_files",
+          "columnsFrom": [
+            "pdf_file_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_contracts_contract_type": {
+          "name": "ck_contracts_contract_type",
+          "value": "\"contracts\".\"contract_type\" in ('conventional', 'short_stay')"
+        },
+        "ck_contracts_status": {
+          "name": "ck_contracts_status",
+          "value": "\"contracts\".\"status\" in ('active', 'ended', 'cancelled')"
+        },
+        "ck_contracts_dates": {
+          "name": "ck_contracts_dates",
+          "value": "\"contracts\".\"end_date\" IS NULL OR \"contracts\".\"end_date\" > \"contracts\".\"start_date\""
+        }
+      }
+    },
+    "feedbacks": {
+      "name": "feedbacks",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attachment_file_id": {
+          "name": "attachment_file_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'open'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_feedbacks_status_created_at": {
+          "name": "ix_feedbacks_status_created_at",
+          "columns": [
+            "status",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "ix_feedbacks_user_id": {
+          "name": "ix_feedbacks_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "ix_feedbacks_attachment_file_id_organization_id": {
+          "name": "ix_feedbacks_attachment_file_id_organization_id",
+          "columns": [
+            "attachment_file_id",
+            "organization_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_feedbacks_organization": {
+          "name": "fk_feedbacks_organization",
+          "tableFrom": "feedbacks",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_feedbacks_user": {
+          "name": "fk_feedbacks_user",
+          "tableFrom": "feedbacks",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_feedbacks_attachment": {
+          "name": "fk_feedbacks_attachment",
+          "tableFrom": "feedbacks",
+          "tableTo": "stored_files",
+          "columnsFrom": [
+            "attachment_file_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_feedbacks_status": {
+          "name": "ck_feedbacks_status",
+          "value": "\"feedbacks\".\"status\" in ('open', 'resolved')"
+        }
+      }
+    },
+    "invitations": {
+      "name": "invitations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'member'"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inviter_id": {
+          "name": "inviter_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_invitations_organization_id_email": {
+          "name": "ix_invitations_organization_id_email",
+          "columns": [
+            "organization_id",
+            "email"
+          ],
+          "isUnique": false
+        },
+        "ix_invitations_inviter_id": {
+          "name": "ix_invitations_inviter_id",
+          "columns": [
+            "inviter_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_invitations_organization": {
+          "name": "fk_invitations_organization",
+          "tableFrom": "invitations",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_invitations_inviter": {
+          "name": "fk_invitations_inviter",
+          "tableFrom": "invitations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "inviter_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_invitations_status": {
+          "name": "ck_invitations_status",
+          "value": "\"invitations\".\"status\" in ('pending', 'accepted', 'rejected', 'canceled')"
+        }
+      }
+    },
+    "members": {
+      "name": "members",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'member'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_members_user_id": {
+          "name": "ix_members_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "uq_members_organization_id_user_id": {
+          "name": "uq_members_organization_id_user_id",
+          "columns": [
+            "organization_id",
+            "user_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_members_organization": {
+          "name": "fk_members_organization",
+          "tableFrom": "members",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_members_user": {
+          "name": "fk_members_user",
+          "tableFrom": "members",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "occupants": {
+      "name": "occupants",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "document": {
+          "name": "document",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_occupants_id_organization_id": {
+          "name": "uq_occupants_id_organization_id",
+          "columns": [
+            "id",
+            "organization_id"
+          ],
+          "isUnique": true
+        },
+        "uq_occupants_organization_id_document": {
+          "name": "uq_occupants_organization_id_document",
+          "columns": [
+            "organization_id",
+            "document"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_occupants_organization": {
+          "name": "fk_occupants_organization",
+          "tableFrom": "occupants",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "organizations": {
+      "name": "organizations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "logo": {
+          "name": "logo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_demo": {
+          "name": "is_demo",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "demo_expires_at": {
+          "name": "demo_expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "organizations_slug_unique": {
+          "name": "organizations_slug_unique",
+          "columns": [
+            "slug"
+          ],
+          "isUnique": true
+        },
+        "ix_organizations_is_demo_demo_expires_at": {
+          "name": "ix_organizations_is_demo_demo_expires_at",
+          "columns": [
+            "is_demo",
+            "demo_expires_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "properties": {
+      "name": "properties",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by_id": {
+          "name": "created_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "agency_id": {
+          "name": "agency_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "property_type": {
+          "name": "property_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "subtype_id": {
+          "name": "subtype_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "usage_type": {
+          "name": "usage_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ownership_percentage": {
+          "name": "ownership_percentage",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 100
+        },
+        "total_area": {
+          "name": "total_area",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "private_area": {
+          "name": "private_area",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "bedrooms": {
+          "name": "bedrooms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "suites": {
+          "name": "suites",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "bathrooms": {
+          "name": "bathrooms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "parking_spaces": {
+          "name": "parking_spaces",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "parking_spot_label": {
+          "name": "parking_spot_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "built_year": {
+          "name": "built_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "conservation_state": {
+          "name": "conservation_state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "estimated_value_cents": {
+          "name": "estimated_value_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "annual_expenses_cents": {
+          "name": "annual_expenses_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "0"
+        },
+        "occupancy_rate": {
+          "name": "occupancy_rate",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 90
+        },
+        "rental_mode": {
+          "name": "rental_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'manual'"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "listing_price_cents": {
+          "name": "listing_price_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "listing_consented_at": {
+          "name": "listing_consented_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "listing_hidden_at": {
+          "name": "listing_hidden_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_properties_organization_id_created_by_id": {
+          "name": "ix_properties_organization_id_created_by_id",
+          "columns": [
+            "organization_id",
+            "created_by_id"
+          ],
+          "isUnique": false
+        },
+        "ix_properties_organization_id_client_id": {
+          "name": "ix_properties_organization_id_client_id",
+          "columns": [
+            "organization_id",
+            "client_id"
+          ],
+          "isUnique": false
+        },
+        "ix_properties_organization_id_agency_id": {
+          "name": "ix_properties_organization_id_agency_id",
+          "columns": [
+            "organization_id",
+            "agency_id"
+          ],
+          "isUnique": false
+        },
+        "ix_properties_organization_id_property_type": {
+          "name": "ix_properties_organization_id_property_type",
+          "columns": [
+            "organization_id",
+            "property_type"
+          ],
+          "isUnique": false
+        },
+        "ix_properties_subtype_id": {
+          "name": "ix_properties_subtype_id",
+          "columns": [
+            "subtype_id"
+          ],
+          "isUnique": false
+        },
+        "ix_properties_public_listings": {
+          "name": "ix_properties_public_listings",
+          "columns": [
+            "\"listing_consented_at\" desc",
+            "id"
+          ],
+          "isUnique": false,
+          "where": "\"properties\".\"listing_price_cents\" IS NOT NULL AND \"properties\".\"listing_hidden_at\" IS NULL"
+        },
+        "uq_properties_id_organization_id": {
+          "name": "uq_properties_id_organization_id",
+          "columns": [
+            "id",
+            "organization_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_properties_organization": {
+          "name": "fk_properties_organization",
+          "tableFrom": "properties",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_properties_createdBy": {
+          "name": "fk_properties_createdBy",
+          "tableFrom": "properties",
+          "tableTo": "members",
+          "columnsFrom": [
+            "organization_id",
+            "created_by_id"
+          ],
+          "columnsTo": [
+            "organization_id",
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_properties_client": {
+          "name": "fk_properties_client",
+          "tableFrom": "properties",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "client_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_properties_agency": {
+          "name": "fk_properties_agency",
+          "tableFrom": "properties",
+          "tableTo": "agencies",
+          "columnsFrom": [
+            "agency_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_properties_subtype": {
+          "name": "fk_properties_subtype",
+          "tableFrom": "properties",
+          "tableTo": "property_subtypes",
+          "columnsFrom": [
+            "subtype_id",
+            "property_type"
+          ],
+          "columnsTo": [
+            "id",
+            "property_type"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "fk_properties_allowedUsage": {
+          "name": "fk_properties_allowedUsage",
+          "tableFrom": "properties",
+          "tableTo": "property_type_usages",
+          "columnsFrom": [
+            "property_type",
+            "usage_type"
+          ],
+          "columnsTo": [
+            "property_type",
+            "usage_type"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_properties_property_type": {
+          "name": "ck_properties_property_type",
+          "value": "\"properties\".\"property_type\" in ('residential', 'commercial', 'land', 'logistics', 'rural', 'parking')"
+        },
+        "ck_properties_usage_type": {
+          "name": "ck_properties_usage_type",
+          "value": "\"properties\".\"usage_type\" in ('rental', 'short_stay', 'agricultural_lease', 'concession', 'own_use', 'loan_for_use')"
+        },
+        "ck_properties_conservation_state": {
+          "name": "ck_properties_conservation_state",
+          "value": "\"properties\".\"conservation_state\" in ('degraded', 'poor', 'regular', 'good', 'excellent')"
+        },
+        "ck_properties_rental_mode": {
+          "name": "ck_properties_rental_mode",
+          "value": "\"properties\".\"rental_mode\" in ('manual', 'contract')"
+        },
+        "ck_properties_ownership": {
+          "name": "ck_properties_ownership",
+          "value": "\"properties\".\"ownership_percentage\" > 0 AND \"properties\".\"ownership_percentage\" <= 100"
+        },
+        "ck_properties_occupancy": {
+          "name": "ck_properties_occupancy",
+          "value": "\"properties\".\"occupancy_rate\" >= 0 AND \"properties\".\"occupancy_rate\" <= 100"
+        },
+        "ck_properties_parking_spot": {
+          "name": "ck_properties_parking_spot",
+          "value": "\"properties\".\"parking_spot_label\" IS NULL OR \"properties\".\"property_type\" = 'parking'"
+        },
+        "ck_properties_values": {
+          "name": "ck_properties_values",
+          "value": "COALESCE(\"properties\".\"estimated_value_cents\", 0) >= 0 AND \"properties\".\"annual_expenses_cents\" >= 0"
+        },
+        "ck_properties_areas": {
+          "name": "ck_properties_areas",
+          "value": "COALESCE(\"properties\".\"total_area\", 0) >= 0 AND COALESCE(\"properties\".\"private_area\", 0) >= 0"
+        },
+        "ck_properties_listing": {
+          "name": "ck_properties_listing",
+          "value": "\"properties\".\"listing_price_cents\" IS NULL OR (\"properties\".\"listing_price_cents\" > 0 AND \"properties\".\"listing_consented_at\" IS NOT NULL)"
+        }
+      }
+    },
+    "property_acquisitions": {
+      "name": "property_acquisitions",
+      "columns": {
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "acquisition_type": {
+          "name": "acquisition_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "acquired_on": {
+          "name": "acquired_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cost_cents": {
+          "name": "cost_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_property_acquisitions_property_id_acquisition_type": {
+          "name": "uq_property_acquisitions_property_id_acquisition_type",
+          "columns": [
+            "property_id",
+            "acquisition_type"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_property_acquisitions_property": {
+          "name": "fk_property_acquisitions_property",
+          "tableFrom": "property_acquisitions",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_property_acquisitions_acquisition_type": {
+          "name": "ck_property_acquisitions_acquisition_type",
+          "value": "\"property_acquisitions\".\"acquisition_type\" in ('purchase', 'construction', 'inheritance', 'other')"
+        },
+        "ck_acquisitions_cost": {
+          "name": "ck_acquisitions_cost",
+          "value": "\"property_acquisitions\".\"cost_cents\" IS NULL OR \"property_acquisitions\".\"cost_cents\" >= 0"
+        }
+      }
+    },
+    "property_addresses": {
+      "name": "property_addresses",
+      "columns": {
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "city_id": {
+          "name": "city_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "postal_code": {
+          "name": "postal_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "street": {
+          "name": "street",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "number": {
+          "name": "number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "complement": {
+          "name": "complement",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "neighborhood": {
+          "name": "neighborhood",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "latitude": {
+          "name": "latitude",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "longitude": {
+          "name": "longitude",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_property_addresses_city_id": {
+          "name": "ix_property_addresses_city_id",
+          "columns": [
+            "city_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_property_addresses_property": {
+          "name": "fk_property_addresses_property",
+          "tableFrom": "property_addresses",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_property_addresses_city": {
+          "name": "fk_property_addresses_city",
+          "tableFrom": "property_addresses",
+          "tableTo": "cities",
+          "columnsFrom": [
+            "city_id"
+          ],
+          "columnsTo": [
+            "ibge_code"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "property_documents": {
+      "name": "property_documents",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "file_id": {
+          "name": "file_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "property_documents_file_id_unique": {
+          "name": "property_documents_file_id_unique",
+          "columns": [
+            "file_id"
+          ],
+          "isUnique": true
+        },
+        "ix_property_documents_property_id": {
+          "name": "ix_property_documents_property_id",
+          "columns": [
+            "property_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_property_documents_property": {
+          "name": "fk_property_documents_property",
+          "tableFrom": "property_documents",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_property_documents_file": {
+          "name": "fk_property_documents_file",
+          "tableFrom": "property_documents",
+          "tableTo": "stored_files",
+          "columnsFrom": [
+            "file_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "property_financings": {
+      "name": "property_financings",
+      "columns": {
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "acquisition_type": {
+          "name": "acquisition_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "lender": {
+          "name": "lender",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "financed_amount_cents": {
+          "name": "financed_amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "term_months": {
+          "name": "term_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "annual_interest_rate": {
+          "name": "annual_interest_rate",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amortization_system": {
+          "name": "amortization_system",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_installment_on": {
+          "name": "first_installment_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_property_financings_property_id_acquisition_type": {
+          "name": "uq_property_financings_property_id_acquisition_type",
+          "columns": [
+            "property_id",
+            "acquisition_type"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_property_financings_acquisition": {
+          "name": "fk_property_financings_acquisition",
+          "tableFrom": "property_financings",
+          "tableTo": "property_acquisitions",
+          "columnsFrom": [
+            "property_id",
+            "acquisition_type"
+          ],
+          "columnsTo": [
+            "property_id",
+            "acquisition_type"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_property_financings_acquisition_type": {
+          "name": "ck_property_financings_acquisition_type",
+          "value": "\"property_financings\".\"acquisition_type\" in ('purchase', 'construction', 'inheritance', 'other')"
+        },
+        "ck_property_financings_amortization_system": {
+          "name": "ck_property_financings_amortization_system",
+          "value": "\"property_financings\".\"amortization_system\" in ('sac', 'price')"
+        },
+        "ck_financings_acquisition_type": {
+          "name": "ck_financings_acquisition_type",
+          "value": "\"property_financings\".\"acquisition_type\" IN ('purchase', 'construction')"
+        },
+        "ck_financings_values": {
+          "name": "ck_financings_values",
+          "value": "\"property_financings\".\"financed_amount_cents\" > 0 AND \"property_financings\".\"term_months\" > 0 AND \"property_financings\".\"annual_interest_rate\" >= 0"
+        }
+      }
+    },
+    "property_insurances": {
+      "name": "property_insurances",
+      "columns": {
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_property_insurances_property": {
+          "name": "fk_property_insurances_property",
+          "tableFrom": "property_insurances",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "property_legal_records": {
+      "name": "property_legal_records",
+      "columns": {
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "registration_status": {
+          "name": "registration_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'regular'"
+        },
+        "irregularity_description": {
+          "name": "irregularity_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "registry_number": {
+          "name": "registry_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "registry_office": {
+          "name": "registry_office",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_property_legal_records_property": {
+          "name": "fk_property_legal_records_property",
+          "tableFrom": "property_legal_records",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_property_legal_records_registration_status": {
+          "name": "ck_property_legal_records_registration_status",
+          "value": "\"property_legal_records\".\"registration_status\" in ('regular', 'irregular')"
+        },
+        "ck_legal_irregularity": {
+          "name": "ck_legal_irregularity",
+          "value": "\"property_legal_records\".\"irregularity_description\" IS NULL OR \"property_legal_records\".\"registration_status\" = 'irregular'"
+        }
+      }
+    },
+    "property_manual_rentals": {
+      "name": "property_manual_rentals",
+      "columns": {
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_name": {
+          "name": "tenant_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "monthly_rent_cents": {
+          "name": "monthly_rent_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "0"
+        },
+        "due_day": {
+          "name": "due_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fk_property_manual_rentals_property": {
+          "name": "fk_property_manual_rentals_property",
+          "tableFrom": "property_manual_rentals",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_manual_rentals_values": {
+          "name": "ck_manual_rentals_values",
+          "value": "\"property_manual_rentals\".\"monthly_rent_cents\" >= 0 AND (\"property_manual_rentals\".\"due_day\" IS NULL OR \"property_manual_rentals\".\"due_day\" BETWEEN 1 AND 31)"
+        }
+      }
+    },
+    "property_photos": {
+      "name": "property_photos",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "file_id": {
+          "name": "file_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "position": {
+          "name": "position",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_property_photos_property_id_position": {
+          "name": "ix_property_photos_property_id_position",
+          "columns": [
+            "property_id",
+            "position"
+          ],
+          "isUnique": false
+        },
+        "ix_property_photos_file_id_organization_id": {
+          "name": "ix_property_photos_file_id_organization_id",
+          "columns": [
+            "file_id",
+            "organization_id"
+          ],
+          "isUnique": false
+        },
+        "uq_property_photos_property_id_file_id": {
+          "name": "uq_property_photos_property_id_file_id",
+          "columns": [
+            "property_id",
+            "file_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_property_photos_property": {
+          "name": "fk_property_photos_property",
+          "tableFrom": "property_photos",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_property_photos_file": {
+          "name": "fk_property_photos_file",
+          "tableFrom": "property_photos",
+          "tableTo": "stored_files",
+          "columnsFrom": [
+            "file_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "property_proposals": {
+      "name": "property_proposals",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "proposal_type": {
+          "name": "proposal_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount_cents": {
+          "name": "amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "proposal_date": {
+          "name": "proposal_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contact": {
+          "name": "contact",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_property_proposals_property_id_proposal_date": {
+          "name": "ix_property_proposals_property_id_proposal_date",
+          "columns": [
+            "property_id",
+            "proposal_date"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_property_proposals_property": {
+          "name": "fk_property_proposals_property",
+          "tableFrom": "property_proposals",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_property_proposals_proposal_type": {
+          "name": "ck_property_proposals_proposal_type",
+          "value": "\"property_proposals\".\"proposal_type\" in ('purchase', 'sale', 'rental', 'linked', 'informal')"
+        },
+        "ck_proposals_amount": {
+          "name": "ck_proposals_amount",
+          "value": "\"property_proposals\".\"amount_cents\" > 0"
+        }
+      }
+    },
+    "property_subtypes": {
+      "name": "property_subtypes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "property_type": {
+          "name": "property_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_property_subtypes_property_type_name": {
+          "name": "uq_property_subtypes_property_type_name",
+          "columns": [
+            "property_type",
+            "name"
+          ],
+          "isUnique": true
+        },
+        "uq_property_subtypes_id_property_type": {
+          "name": "uq_property_subtypes_id_property_type",
+          "columns": [
+            "id",
+            "property_type"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_property_subtypes_property_type": {
+          "name": "ck_property_subtypes_property_type",
+          "value": "\"property_subtypes\".\"property_type\" in ('residential', 'commercial', 'land', 'logistics', 'rural', 'parking')"
+        }
+      }
+    },
+    "property_type_usages": {
+      "name": "property_type_usages",
+      "columns": {
+        "property_type": {
+          "name": "property_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "usage_type": {
+          "name": "usage_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "property_type_usages_property_type_usage_type_pk": {
+          "columns": [
+            "property_type",
+            "usage_type"
+          ],
+          "name": "property_type_usages_property_type_usage_type_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_property_type_usages_property_type": {
+          "name": "ck_property_type_usages_property_type",
+          "value": "\"property_type_usages\".\"property_type\" in ('residential', 'commercial', 'land', 'logistics', 'rural', 'parking')"
+        },
+        "ck_property_type_usages_usage_type": {
+          "name": "ck_property_type_usages_usage_type",
+          "value": "\"property_type_usages\".\"usage_type\" in ('rental', 'short_stay', 'agricultural_lease', 'concession', 'own_use', 'loan_for_use')"
+        }
+      }
+    },
+    "reservations": {
+      "name": "reservations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contract_id": {
+          "name": "contract_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "occupant_id": {
+          "name": "occupant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "check_in": {
+          "name": "check_in",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "check_out": {
+          "name": "check_out",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "total_amount_cents": {
+          "name": "total_amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "0"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'confirmed'"
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_reservations_property_id_check_in": {
+          "name": "ix_reservations_property_id_check_in",
+          "columns": [
+            "property_id",
+            "check_in"
+          ],
+          "isUnique": false
+        },
+        "ix_reservations_organization_id_check_in": {
+          "name": "ix_reservations_organization_id_check_in",
+          "columns": [
+            "organization_id",
+            "check_in"
+          ],
+          "isUnique": false
+        },
+        "ix_reservations_contract_id_property_id": {
+          "name": "ix_reservations_contract_id_property_id",
+          "columns": [
+            "contract_id",
+            "property_id"
+          ],
+          "isUnique": false
+        },
+        "ix_reservations_occupant_id_organization_id": {
+          "name": "ix_reservations_occupant_id_organization_id",
+          "columns": [
+            "occupant_id",
+            "organization_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_reservations_property": {
+          "name": "fk_reservations_property",
+          "tableFrom": "reservations",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_reservations_occupant": {
+          "name": "fk_reservations_occupant",
+          "tableFrom": "reservations",
+          "tableTo": "occupants",
+          "columnsFrom": [
+            "occupant_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_reservations_contract": {
+          "name": "fk_reservations_contract",
+          "tableFrom": "reservations",
+          "tableTo": "contracts",
+          "columnsFrom": [
+            "contract_id",
+            "property_id"
+          ],
+          "columnsTo": [
+            "id",
+            "property_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_reservations_status": {
+          "name": "ck_reservations_status",
+          "value": "\"reservations\".\"status\" in ('confirmed', 'cancelled')"
+        },
+        "ck_reservations_dates": {
+          "name": "ck_reservations_dates",
+          "value": "\"reservations\".\"check_out\" > \"reservations\".\"check_in\""
+        },
+        "ck_reservations_total": {
+          "name": "ck_reservations_total",
+          "value": "\"reservations\".\"total_amount_cents\" >= 0"
+        }
+      }
+    },
+    "sessions": {
+      "name": "sessions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active_organization_id": {
+          "name": "active_organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "impersonated_by_id": {
+          "name": "impersonated_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "sessions_token_unique": {
+          "name": "sessions_token_unique",
+          "columns": [
+            "token"
+          ],
+          "isUnique": true
+        },
+        "ix_sessions_user_id": {
+          "name": "ix_sessions_user_id",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "ix_sessions_expires_at": {
+          "name": "ix_sessions_expires_at",
+          "columns": [
+            "expires_at"
+          ],
+          "isUnique": false
+        },
+        "ix_sessions_active_organization_id": {
+          "name": "ix_sessions_active_organization_id",
+          "columns": [
+            "active_organization_id"
+          ],
+          "isUnique": false
+        },
+        "ix_sessions_impersonated_by_id": {
+          "name": "ix_sessions_impersonated_by_id",
+          "columns": [
+            "impersonated_by_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_sessions_user": {
+          "name": "fk_sessions_user",
+          "tableFrom": "sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_sessions_activeOrganization": {
+          "name": "fk_sessions_activeOrganization",
+          "tableFrom": "sessions",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "active_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "fk_sessions_impersonator": {
+          "name": "fk_sessions_impersonator",
+          "tableFrom": "sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "impersonated_by_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "stored_files": {
+      "name": "stored_files",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uploaded_by_id": {
+          "name": "uploaded_by_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "storage_key": {
+          "name": "storage_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "size_bytes": {
+          "name": "size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "stored_files_storage_key_unique": {
+          "name": "stored_files_storage_key_unique",
+          "columns": [
+            "storage_key"
+          ],
+          "isUnique": true
+        },
+        "ix_stored_files_organization_id_uploaded_by_id": {
+          "name": "ix_stored_files_organization_id_uploaded_by_id",
+          "columns": [
+            "organization_id",
+            "uploaded_by_id"
+          ],
+          "isUnique": false
+        },
+        "ix_stored_files_created_at": {
+          "name": "ix_stored_files_created_at",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "uq_stored_files_id_organization_id": {
+          "name": "uq_stored_files_id_organization_id",
+          "columns": [
+            "id",
+            "organization_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "fk_stored_files_organization": {
+          "name": "fk_stored_files_organization",
+          "tableFrom": "stored_files",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_stored_files_uploadedBy": {
+          "name": "fk_stored_files_uploadedBy",
+          "tableFrom": "stored_files",
+          "tableTo": "members",
+          "columnsFrom": [
+            "organization_id",
+            "uploaded_by_id"
+          ],
+          "columnsTo": [
+            "organization_id",
+            "user_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_stored_files_size": {
+          "name": "ck_stored_files_size",
+          "value": "\"stored_files\".\"size_bytes\" >= 0"
+        }
+      }
+    },
+    "transaction_categories": {
+      "name": "transaction_categories",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "transaction_type": {
+          "name": "transaction_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_transaction_categories_transaction_type_name": {
+          "name": "uq_transaction_categories_transaction_type_name",
+          "columns": [
+            "transaction_type",
+            "name"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_transaction_categories_transaction_type": {
+          "name": "ck_transaction_categories_transaction_type",
+          "value": "\"transaction_categories\".\"transaction_type\" in ('revenue', 'expense')"
+        }
+      }
+    },
+    "transactions": {
+      "name": "transactions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "property_id": {
+          "name": "property_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount_cents": {
+          "name": "amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurred_on": {
+          "name": "occurred_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_recurring": {
+          "name": "is_recurring",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "recurrence_ends_on": {
+          "name": "recurrence_ends_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_transactions_property_id_occurred_on": {
+          "name": "ix_transactions_property_id_occurred_on",
+          "columns": [
+            "property_id",
+            "occurred_on"
+          ],
+          "isUnique": false
+        },
+        "ix_transactions_organization_id_occurred_on": {
+          "name": "ix_transactions_organization_id_occurred_on",
+          "columns": [
+            "organization_id",
+            "occurred_on"
+          ],
+          "isUnique": false
+        },
+        "ix_transactions_category_id": {
+          "name": "ix_transactions_category_id",
+          "columns": [
+            "category_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_transactions_property": {
+          "name": "fk_transactions_property",
+          "tableFrom": "transactions",
+          "tableTo": "properties",
+          "columnsFrom": [
+            "property_id",
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id",
+            "organization_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fk_transactions_category": {
+          "name": "fk_transactions_category",
+          "tableFrom": "transactions",
+          "tableTo": "transaction_categories",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "ck_transactions_amount": {
+          "name": "ck_transactions_amount",
+          "value": "\"transactions\".\"amount_cents\" > 0"
+        },
+        "ck_transactions_recurrence": {
+          "name": "ck_transactions_recurrence",
+          "value": "\"transactions\".\"recurrence_ends_on\" IS NULL OR (\"transactions\".\"is_recurring\" AND \"transactions\".\"recurrence_ends_on\" >= \"transactions\".\"occurred_on\")"
+        }
+      }
+    },
+    "users": {
+      "name": "users",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email_verified": {
+          "name": "email_verified",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_anonymous": {
+          "name": "is_anonymous",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'user'"
+        },
+        "banned": {
+          "name": "banned",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "ban_reason": {
+          "name": "ban_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "ban_expires_at": {
+          "name": "ban_expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "columns": [
+            "email"
+          ],
+          "isUnique": true
+        },
+        "uq_users_email_lower": {
+          "name": "uq_users_email_lower",
+          "columns": [
+            "lower(\"email\")"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "verifications": {
+      "name": "verifications",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ix_verifications_identifier": {
+          "name": "ix_verifications_identifier",
+          "columns": [
+            "identifier"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {
+      "ix_properties_public_listings": {
+        "columns": {
+          "\"listing_consented_at\" desc": {
+            "isExpression": true
+          }
+        }
+      },
+      "uq_users_email_lower": {
+        "columns": {
+          "lower(\"email\")": {
+            "isExpression": true
+          }
+        }
+      }
+    }
+  }
+}
