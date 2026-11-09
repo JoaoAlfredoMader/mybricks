@@ -13,7 +13,10 @@
     "coverage": "vitest run --coverage",
     "typecheck": "tsc -b",
     "hero:images": "node scripts/build-hero-images.mjs",
-    "api:types": "npm --prefix ../api run openapi:export && npx --yes openapi-typescript@7.13.0 ../api/docs/openapi.json -o src/lib/api/schema.d.ts"
+    "api:types": "npm --prefix ../api run openapi:export && npx --yes openapi-typescript@7.13.0 ../api/docs/openapi.json -o src/lib/api/schema.d.ts",
+    "deploy": "wrangler deploy --env=\"\"",
+    "deploy:staging": "wrangler deploy --env staging",
+    "dev:worker": "wrangler dev --port 8788"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -52,6 +55,7 @@
     "sharp": "^0.35.5",
     "typescript": "~7.0.2",
     "vite": "^8.3.5",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "wrangler": "^4.158.0"
   }
 }

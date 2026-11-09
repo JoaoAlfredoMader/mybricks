@@ -4,7 +4,7 @@
   "main": "src/worker.ts",
   // Pin the date: it decides which runtime behaviors the Worker gets. Raise it on purpose, not by accident.
   "compatibility_date": "2026-11-01",
-  // pg (through Prisma), Better Auth and the AWS SDK use Node APIs.
+  // Better Auth, the PDF generator and the e-mail/storage drivers use Node APIs (Buffer, crypto, async hooks).
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
@@ -39,8 +39,38 @@
     "EMAIL_DRIVER": "resend",
     "EMAIL_FROM": "MyBricks <nao-responder@mybricks.com.br>",
     "MAINTENANCE_INTERVAL_MINUTES": "0"
-  }
+  },
 
-  // Route on the real domain (the zone has to be on Cloudflare first); the front-end Worker owns the rest:
-  // "routes": [{ "pattern": "mybricks.com.br/api/*", "zone_name": "mybricks.com.br" }]
+  // The API answers on the real domain under /api/*; the front-end Worker owns everything else, so the
+  // browser sees ONE origin (cookies and no CORS). The zone has to be on Cloudflare, with a proxied DNS record for the host.
+  "routes": [{ "pattern": "mybricks.com.br/api/*", "zone_name": "mybricks.com.br" }],
+
+  // Homologation: same code, its own database, bucket and host. `npx wrangler deploy --env staging`.
+  // Nothing is inherited for these keys, so each one is repeated. Never point it at production data.
+  "env": {
+    "staging": {
+      "name": "mybricks-api-staging",
+      "define": { "import.meta.url": "\"file:///worker/index.js\"" },
+      "routes": [{ "pattern": "staging.mybricks.com.br/api/*", "zone_name": "mybricks.com.br" }],
+      "triggers": { "crons": ["0 * * * *"] },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "mybricks-staging",
+          // Replace with the id printed by `npx wrangler d1 create mybricks-staging`.
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "mybricks-files-staging" }],
+      "vars": {
+        "NODE_ENV": "production",
+        "BETTER_AUTH_URL": "https://staging.mybricks.com.br",
+        "FRONTEND_URL": "https://staging.mybricks.com.br",
+        "EMAIL_DRIVER": "resend",
+        "EMAIL_FROM": "MyBricks Homologação <nao-responder@mybricks.com.br>",
+        "MAINTENANCE_INTERVAL_MINUTES": "0"
+      }
+    }
+  }
 }

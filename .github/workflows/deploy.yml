@@ -1,0 +1,51 @@
+name: Deploy
+
+# main -> production (mybricks.com.br), development -> staging (staging.mybricks.com.br).
+# Nothing deploys until the repository variable DEPLOY_ENABLED is set to "true" (Settings > Secrets and
+# variables > Actions > Variables), so merging this file before the Cloudflare account is ready is harmless.
+# Each GitHub environment ("production", "staging") holds its own CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
+on:
+  push:
+    branches: [main, development]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Empty selects the top-level (production) configuration of the wrangler files.
+      WRANGLER_ENV: ${{ github.ref_name == 'main' && '' || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # The deploy is only as good as the code: same checks as CI, again, on exactly this commit.
+      - run: npm run typecheck
+      - run: npm test -w api
+
+      - name: Build the front-end
+        run: npm run build -w app
+
+      # The database first (additive migrations only: the running version must keep working during it), then the code.
+      - name: Apply the D1 migrations
+        working-directory: api
+        run: npx wrangler d1 migrations apply DB --remote --env="$WRANGLER_ENV"
+      - name: Deploy the API
+        working-directory: api
+        run: npx wrangler deploy --env="$WRANGLER_ENV"
+      - name: Deploy the front-end
+        working-directory: app
+        run: npx wrangler deploy --env="$WRANGLER_ENV"

@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mybricks-app",
+  // Pin the date: it decides which runtime behaviors the Worker gets. Raise it on purpose, not by accident.
+  "compatibility_date": "2026-11-01",
+
+  // No script: this Worker only serves the built front-end. Unknown paths get index.html, so the
+  // router (TanStack Router) can open /app/imoveis, /login and the rest on a reload or a shared link.
+  "assets": { "directory": "./dist", "not_found_handling": "single-page-application" },
+
+  // The API Worker has the more specific route (mybricks.com.br/api/*), so it wins for /api.
+  // The zone has to be on Cloudflare, with a proxied DNS record for the host.
+  "routes": [{ "pattern": "mybricks.com.br/*", "zone_name": "mybricks.com.br" }],
+
+  // Homologation: `npx wrangler deploy --env staging`.
+  "env": {
+    "staging": {
+      "name": "mybricks-app-staging",
+      "assets": { "directory": "./dist", "not_found_handling": "single-page-application" },
+      "routes": [{ "pattern": "staging.mybricks.com.br/*", "zone_name": "mybricks.com.br" }]
+    }
+  }
+}
