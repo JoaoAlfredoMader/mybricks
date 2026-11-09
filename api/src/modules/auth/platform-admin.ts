@@ -38,6 +38,7 @@ export async function ensurePlatformAdmin(
   // Goes through Better Auth so the password is hashed the way sign-in expects, and the
   // account gets its personal organization like any other user.
   await auth.api.signUpEmail({ body: { name, email: normalized, password } });
-  await prisma.user.update({ where: { email: normalized }, data: { role: "admin" } });
+  // The operator is created from the console, by someone who controls the server: no link to click.
+  await prisma.user.update({ where: { email: normalized }, data: { role: "admin", emailVerified: true } });
   return { created: true, promoted: false };
 }
