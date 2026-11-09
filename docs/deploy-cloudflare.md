@@ -44,7 +44,7 @@ Falta ligar na conta: criar D1 e R2, colocar os ids nos `wrangler.jsonc`, segred
 ## 4. Passos manuais (conta e DNS)
 
 **Cloudflare**
-1. Conta Cloudflare; plano Workers Paid.
+1. Conta Cloudflare (plano grátis; o Workers Paid só se o hash de senha estourar os 10 ms de CPU).
 2. Adicionar a zona `mybricks.com.br` e trocar os *nameservers* no registrador (GoDaddy) para os da Cloudflare. **Isso é pré-requisito do Resend também**, porque os registros DNS dele vão para lá.
 3. Criar o bucket R2: `npx wrangler r2 bucket create mybricks-files` (sem chaves S3: o Worker usa o binding).
 4. Token de API da Cloudflare para o CI (`Workers Scripts: Edit`, `Workers Routes: Edit`, `Account Settings: Read`).

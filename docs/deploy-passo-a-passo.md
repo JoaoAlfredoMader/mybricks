@@ -15,7 +15,7 @@ O código já está pronto (ver [deploy-cloudflare.md](deploy-cloudflare.md) par
    - Mantenha `_dmarc` (política de e-mail). Ignore o aviso "add an MX record": só serve para *receber* e-mail no domínio.
    - O `www` fica de fora das rotas (o login só confia em `mybricks.com.br`): depois do deploy, crie em **Rules → Redirect Rules** um redirecionamento de `www.mybricks.com.br` para `https://mybricks.com.br`.
 
-5. **Workers & Pages → Plans** → assine o **Workers Paid** (US$ 5/mês). Sem ele, o limite de 10 ms de CPU por requisição provavelmente derruba o login (hash de senha).
+5. **Workers Paid (US$ 5/mês): só se for preciso.** Comece no plano grátis (100 mil requisições por dia bastam). O risco é o limite de 10 ms de CPU por requisição: criar conta e entrar fazem o hash da senha, e se estourar o login devolve "exceeded CPU time" (erro 1102). Teste na homologação (seção 4); se der esse erro, assine em **Workers & Pages → Upgrade** e teste de novo.
 6. **R2** → ative (pede um cartão; o uso do MyBricks fica na faixa gratuita).
 
 ## 2. No terminal (na pasta `api`)
@@ -69,7 +69,7 @@ npm run deploy:staging -w api
 npm run deploy:staging -w app
 ```
 
-Abra `https://staging.mybricks.com.br` e teste: criar conta (o e-mail de confirmação tem que chegar), entrar, cadastrar um imóvel com foto, gerar um PDF de contrato, entrar como convidado. Se o login estiver lento ou der erro de CPU, veja o item 5 da seção 1.
+Abra `https://staging.mybricks.com.br` e teste: criar conta (o e-mail de confirmação tem que chegar), entrar, cadastrar um imóvel com foto, gerar um PDF de contrato, entrar como convidado. Se criar conta ou entrar der erro de CPU (1102), veja o item 5 da seção 1.
 
 Funcionou? Produção:
 
