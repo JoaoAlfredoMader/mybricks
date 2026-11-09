@@ -1,0 +1,11 @@
+# Cloudflare Workers static assets read this file. Same-origin API, so nothing here needs to be loosened for it.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+# The hashed bundles never change under the same name.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

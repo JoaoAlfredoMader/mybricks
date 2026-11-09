@@ -16,6 +16,10 @@ const envSchema = z
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
     DEMO_TTL_HOURS: z.coerce.number().int().positive().default(24),
+    /** Most guest workspaces created per rolling 24 hours (each one writes a sample portfolio). 0 = no limit. */
+    DEMO_DAILY_LIMIT: z.coerce.number().int().min(0).default(100),
+    /** Per-address request limits on the auth endpoints. On by default in production; tests and local runs opt in. */
+    RATE_LIMIT: z.enum(["on", "off"]).optional(),
 
     /** Where uploaded files live: a folder on disk (development) or an S3-compatible bucket. */
     STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
@@ -63,6 +67,7 @@ const envSchema = z
   })
   .transform((env) => ({
     ...env,
+    RATE_LIMIT: env.RATE_LIMIT ? env.RATE_LIMIT === "on" : env.NODE_ENV === "production",
     REQUIRE_EMAIL_VERIFICATION: env.REQUIRE_EMAIL_VERIFICATION
       ? env.REQUIRE_EMAIL_VERIFICATION === "true"
       : env.EMAIL_DRIVER === "resend",

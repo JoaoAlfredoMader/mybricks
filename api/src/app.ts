@@ -1,7 +1,9 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
+import { secureHeaders } from "hono/secure-headers";
 import { DEFAULT_LISTINGS_WHATSAPP_NUMBER, type Env } from "./config/env.js";
 import type { Database } from "./db/database.js";
 import type { StorageProvider } from "./lib/storage/storage.js";
@@ -33,6 +35,9 @@ import { AppError } from "./shared/errors/app-error.js";
 import type { AppEnv } from "./shared/http/app-env.js";
 import { blockDeletesWhileImpersonating, loadAuthContext } from "./shared/http/auth.middleware.js";
 
+/** Largest JSON body any route accepts: the biggest real one is the contract template, a few dozen KB. */
+const JSON_BODY_LIMIT_BYTES = 1024 * 1024;
+
 export interface AppDependencies {
   db: Database;
   env: Pick<Env, "FRONTEND_URL"> & Partial<Pick<Env, "NODE_ENV" | "MAX_UPLOAD_MB" | "BETTER_AUTH_URL" | "LISTINGS_WHATSAPP_NUMBER">>;
@@ -51,6 +56,14 @@ export function createApp({ db, env, auth, provisioning, audit, storage }: AppDe
   // Request logs would drown the test output.
   if (env.NODE_ENV !== "test") app.use(logger());
   app.use("/api/*", cors({ origin: env.FRONTEND_URL, credentials: true }));
+  // nosniff, frame denial, HSTS and the rest of the usual response headers.
+  app.use("*", secureHeaders());
+  // Anything that is not a file upload is a small JSON body; the upload routes enforce their own, larger, limit.
+  const jsonLimit = bodyLimit({
+    maxSize: JSON_BODY_LIMIT_BYTES,
+    onError: (c) => c.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The request body is too large" } }, 413),
+  });
+  app.use("/api/*", (c, next) => (c.req.header("content-type")?.startsWith("multipart/") ? next() : jsonLimit(c, next)));
 
   app.route("/health", createHealthRoutes(db));
   app.route("/api", createOpenApiRoutes({ serverUrl: env.BETTER_AUTH_URL ?? "http://localhost:3000" }));

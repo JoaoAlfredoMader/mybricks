@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type MaintenanceDeps, type MaintenanceReport, startMaintenanceJob } from "../../src/modules/maintenance/maintenance.js";
 
-const EMPTY: MaintenanceReport = { expiredDemoOrganizations: 0, anonymousUsersRemoved: 0, orphanFilesSwept: 0, auditEntriesPurged: 0, expiredSessionsPurged: 0, expiredVerificationsPurged: 0 };
+const EMPTY: MaintenanceReport = { expiredDemoOrganizations: 0, anonymousUsersRemoved: 0, orphanFilesSwept: 0, auditEntriesPurged: 0, expiredSessionsPurged: 0, expiredVerificationsPurged: 0, rateLimitCountersPurged: 0 };
 const deps = { db: {} as MaintenanceDeps["db"], storage: {} as MaintenanceDeps["storage"] };
 
 describe("the maintenance job", () => {

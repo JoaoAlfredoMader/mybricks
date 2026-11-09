@@ -174,6 +174,20 @@ describe('Login page', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('says so when the guest demo is at capacity', async () => {
+    const user = userEvent.setup()
+    fakeApi({
+      handlers: {
+        'POST /api/auth/sign-in/anonymous': () => json({ code: 'DEMO_LIMIT_REACHED', message: 'at capacity' }, 429),
+      },
+    })
+    renderRoute('/login')
+
+    await user.click(await screen.findByRole('button', { name: 'Entrar como convidado' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('A demonstração está com muitos acessos agora.')
+  })
+
   it('enters the demo as a guest', async () => {
     const user = userEvent.setup()
     const api = fakeApi({

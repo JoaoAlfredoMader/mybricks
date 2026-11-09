@@ -20,6 +20,7 @@ const MESSAGES: Record<string, string> = {
   PASSWORD_TOO_SHORT: 'A senha precisa ter pelo menos 8 caracteres.',
   PASSWORD_TOO_LONG: 'Essa senha é longa demais.',
   BANNED_USER: 'Esta conta foi suspensa.',
+  DEMO_LIMIT_REACHED: 'A demonstração está com muitos acessos agora. Tente mais tarde ou crie uma conta.',
   EMAIL_NOT_VERIFIED: 'Confirme seu e-mail antes de entrar. Enviamos um novo link para a sua caixa de entrada.',
 }
 

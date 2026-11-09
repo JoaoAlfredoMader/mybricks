@@ -11,6 +11,7 @@ import {
   occupants,
   organizations,
   properties,
+  rateLimits,
   sessions,
   storedFiles,
   users,
@@ -38,6 +39,8 @@ export interface MaintenanceReport {
   auditEntriesPurged: number;
   expiredSessionsPurged: number;
   expiredVerificationsPurged: number;
+  /** Request counters of Better Auth's rate limiting that no window can still use. */
+  rateLimitCountersPurged: number;
 }
 
 const DAY_MS = 86_400_000;
@@ -104,6 +107,7 @@ export async function runMaintenance({
     auditEntriesPurged: 0,
     expiredSessionsPurged: 0,
     expiredVerificationsPurged: 0,
+    rateLimitCountersPurged: 0,
   };
 
   // 1. Expired demos.
@@ -148,6 +152,9 @@ export async function runMaintenance({
   // 4. Expired sessions and verification tokens.
   report.expiredSessionsPurged = await deleteAndCount(db, sessions, lt(sessions.expiresAt, now));
   report.expiredVerificationsPurged = await deleteAndCount(db, verifications, lt(verifications.expiresAt, now));
+
+  // 5. Rate limit counters: the longest window is an hour, so a day-old row never matters again.
+  report.rateLimitCountersPurged = await deleteAndCount(db, rateLimits, lt(rateLimits.lastRequest, now.getTime() - DAY_MS));
 
   return report;
 }

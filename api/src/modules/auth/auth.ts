@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
-import { createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
+import { and, count, eq, gte } from "drizzle-orm";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, anonymous, openAPI, organization } from "better-auth/plugins";
 import type { Env } from "../../config/env.js";
@@ -61,6 +62,7 @@ export function createAuth({ db, env, provisioning, audit, mailer, runInBackgrou
         account: schema.accounts,
         verification: schema.verifications,
         organization: schema.organizations,
+        rateLimit: schema.rateLimits,
         member: schema.members,
         invitation: schema.invitations,
       },
@@ -127,9 +129,41 @@ export function createAuth({ db, env, provisioning, audit, mailer, runInBackgrou
       }),
     ],
 
+    // Counters live in the database: a Worker has no memory shared between requests or instances, so the
+    // default in-memory store would not limit anything. The address comes from Cloudflare's own header.
+    rateLimit: {
+      enabled: env.RATE_LIMIT,
+      storage: "database",
+      window: 60,
+      max: 120,
+      customRules: {
+        "/sign-in/email": { window: 60, max: 10 },
+        "/sign-up/email": { window: 600, max: 5 },
+        "/send-verification-email": { window: 300, max: 3 },
+        "/sign-in/anonymous": { window: 3600, max: 5 },
+        // The front-end polls these through /api/me; they are cheap and read-only.
+        "/get-session": false,
+      },
+    },
+
     hooks: {
       // Sessions are destroyed by these calls, so who is acting has to be read before they run.
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === "/sign-in/anonymous" && env.DEMO_DAILY_LIMIT > 0) {
+          // Every guest gets a sample portfolio (hundreds of rows written): cap how many a day can start,
+          // so an automated loop cannot fill the database or burn the day's write quota.
+          const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const [recent] = await db
+            .select({ value: count() })
+            .from(schema.organizations)
+            .where(and(eq(schema.organizations.isDemo, true), gte(schema.organizations.createdAt, since)));
+          if ((recent?.value ?? 0) >= env.DEMO_DAILY_LIMIT) {
+            throw APIError.from("TOO_MANY_REQUESTS", {
+              code: "DEMO_LIMIT_REACHED",
+              message: "The guest demo is at capacity right now. Try again later or create an account.",
+            });
+          }
+        }
         if (ctx.path !== "/sign-out" && ctx.path !== "/admin/stop-impersonating") return;
         const current = await getSessionFromCtx(ctx).catch(() => null);
         if (!current) return;

@@ -101,7 +101,40 @@ Os workflows já estão em `.github/workflows/`. O CI roda em todo push e PR. O 
 
 Daí em diante: push na `main` publica em produção; push na `development` publica na homologação. As migrations do D1 rodam antes do código novo.
 
-## 7. Depois do primeiro deploy
+## 7. Proteção contra excesso de requisições (ataque, bot, abuso)
+
+Como sites reais fazem: em **camadas**, a barata e grossa na frente (borda), a fina e específica atrás (aplicação), e alertas para você ficar sabendo.
+
+**Já está no código (nada a fazer, vale em produção)**
+
+| Camada | O que faz |
+|---|---|
+| Limite por endereço nas rotas de autenticação (`rate_limits` no banco) | entrar: 10 por minuto; criar conta: 5 por 10 min; reenviar confirmação: 3 por 5 min; convidado: 5 por hora; demais rotas de `/api/auth`: 120 por minuto. Passou do limite: HTTP 429. O endereço vem do cabeçalho `cf-connecting-ip` da Cloudflare, que não dá para falsificar |
+| Teto de convidados por dia (`DEMO_DAILY_LIMIT`, padrão 100) | cada convidado grava uma carteira de exemplo; sem teto, um laço automático esgotaria a cota de escrita do D1 (100 mil linhas por dia no plano grátis). Passou do teto: 429 `DEMO_LIMIT_REACHED`, e o front explica |
+| Corpo JSON limitado a 1 MB e upload limitado (`MAX_UPLOAD_MB`) | recusa o corpo gigante sem ler (413) |
+| Cabeçalhos de segurança na API e no front | `nosniff`, sem iframe, HSTS, política de referência |
+| Limpeza automática dos contadores | o cron horário apaga contadores com mais de 1 dia |
+
+**No painel da Cloudflare (domínio `mybricks.com.br`), uma vez, uns 10 minutos**
+
+1. **Security → Bots → Bot Fight Mode:** ligue.
+2. **Security → Settings → Security Level:** `Medium` (o padrão). O *Under Attack Mode* é só para emergência, durante um ataque.
+3. **Security → WAF → Rate limiting rules → Create rule** (o plano grátis tem 1 regra, com janela fixa de 10 s):
+   - Nome: `API burst`
+   - Quando: *URI Path* **wildcard** `/api/*` (expressão: `(http.request.uri.path wildcard "/api/*")`)
+   - Característica: **IP**; limite: **50 requisições em 10 segundos**
+   - Ação: **Block** (por 10 s)
+   - Uma tela do app dispara umas 10 chamadas ao abrir, então 50 é folgado para uso normal e barra rajadas.
+4. **Security → WAF → Managed rules:** confira que o *Cloudflare Managed Free Ruleset* está ligado.
+5. **SSL/TLS → Edge Certificates:** *Always Use HTTPS* ligado e *Minimum TLS Version* 1.2.
+6. **Notifications → Add:** alertas de **DDoS** e de **uso/cobrança** (Billing: Usage-based). Assim você recebe e-mail antes de uma fatura surpresa.
+7. **Proteja as contas** que controlam o sistema: verificação em duas etapas na Cloudflare, no GoDaddy, no GitHub e no Resend. Tokens de API só com as permissões necessárias.
+
+O que acontece num ataque de verdade: o tráfego barrado pelo WAF **nem chega ao Worker** (não conta no limite de 100 mil requisições por dia). Se mesmo assim passar do limite do plano grátis, o site fica indisponível até o dia seguinte, mas **não gera cobrança**. No plano pago, a requisição extra é cobrada por uso (centavos por milhão), e os alertas do item 6 avisam.
+
+**Próximo reforço, quando houver tráfego real:** Cloudflare Turnstile (CAPTCHA gratuito e quase invisível) nos formulários de criar conta, entrar e convidado. O Better Auth tem plugin pronto para isso; falta só o componente no front.
+
+## 8. Depois do primeiro deploy
 
 - Crie a branch `development` (`git switch -c development && git push -u origin development`) e passe a trabalhar nela, com merge na `main` para publicar.
 - Convites de organização e recuperação de senha ainda não mandam e-mail (o Resend já está ligado; falta só chamar).

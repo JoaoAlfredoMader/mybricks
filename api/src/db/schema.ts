@@ -90,6 +90,19 @@ export const verifications = sqliteTable(
   ],
 );
 
+/** Better Auth's request counters (one row per key, e.g. "<ip>/sign-in/email"). Needed because a Worker has no shared memory. */
+export const rateLimits = sqliteTable(
+  "rate_limits",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    key: text("key").notNull().unique(),
+    count: integer("count").notNull(),
+    /** Milliseconds since the epoch of the last counted request. */
+    lastRequest: integer("last_request").notNull(),
+  },
+  (t) => [index("ix_rate_limits_last_request").on(t.lastRequest)],
+);
+
 export const organizations = sqliteTable(
   "organizations",
   {
